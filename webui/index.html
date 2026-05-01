@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LightLLM - 本地大模型管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        
+        /* 导航栏 */
+        .navbar {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .nav-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .nav-btn:hover, .nav-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        /* 系统信息卡片 */
+        .system-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .info-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        
+        .info-card h3 {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .info-card .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        /* 一键部署区域 */
+        .quick-deploy {
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .quick-deploy h2 {
+            margin-bottom: 0.5rem;
+        }
+        
+        .quick-deploy p {
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 1.5rem;
+        }
+        
+        .deploy-btn {
+            background: white;
+            color: var(--primary);
+            border: none;
+            padding: 1rem 3rem;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .deploy-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .deploy-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* 标签页 */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+        
+        .tab {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.2s;
+        }
+        
+        .tab:hover {
+            color: var(--text);
+            background: var(--card-bg);
+        }
+        
+        .tab.active {
+            color: var(--primary);
+            background: var(--card-bg);
+            border-bottom: 2px solid var(--primary);
+        }
+        
+        /* 搜索框 */
+        .search-box {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text);
+            font-size: 1rem;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        /* 模型卡片网格 */
+        .models-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
+        }
+        
+        .model-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: border-color 0.2s;
+        }
+        
+        .model-card:hover {
+            border-color: var(--primary);
+        }
+        
+        .model-card.installed {
+            border-color: var(--success);
+        }
+        
+        .model-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+        
+        .model-name {
+            font-weight: bold;
+            font-size: 1rem;
+        }
+        
+        .model-size {
+            background: var(--border);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        
+        .model-desc {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+        
+        .model-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+        
+        .model-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-warning {
+            background: var(--warning);
+            color: black;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* 进度条 */
+        .progress-container {
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .progress-container.active {
+            display: block;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s;
+        }
+        
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+        
+        /* 弹窗 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .modal h3 {
+            margin-bottom: 1rem;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 1.5rem;
+        }
+        
+        /* 状态标签 */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .status-badge.installed {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+        
+        .status-badge.running {
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--primary);
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+        
+        /* 已安装模型列表 */
+        .installed-section {
+            margin-bottom: 2rem;
+        }
+        
+        .installed-section h3 {
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        /* 提示消息 */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 2000;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .toast.success {
+            border-color: var(--success);
+        }
+        
+        .toast.error {
+            border-color: var(--danger);
+        }
+        
+        /* 加载动画 */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .models-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .navbar {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="logo">⚡ LightLLM</div>
+        <div class="nav-links">
+            <button class="nav-btn active" onclick="showTab('models')">模型市场</button>
+            <button class="nav-btn" onclick="showTab('installed')">我的模型</button>
+            <button class="nav-btn" onclick="showTab('settings')">设置</button>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <!-- 系统信息 -->
+        <div class="system-info" id="systemInfo">
+            <div class="info-card">
+                <h3>💻 系统</h3>
+                <div class="value" id="osInfo">加载中...</div>
+            </div>
+            <div class="info-card">
+                <h3>🧠 内存</h3>
+                <div class="value" id="memoryInfo">-</div>
+            </div>
+            <div class="info-card">
+                <h3>🎮 GPU</h3>
+                <div class="value" id="gpuInfo">-</div>
+            </div>
+            <div class="info-card">
+                <h3>📦 已安装</h3>
+                <div class="value" id="installedCount">-</div>
+            </div>
+        </div>
+        
+        <!-- 一键部署 -->
+        <div class="quick-deploy" id="quickDeploy">
+            <h2>🚀 一键部署本地大模型</h2>
+            <p>根据您的硬件自动选择最合适的模型，点击即可开始使用</p>
+            <button class="deploy-btn" onclick="autoDeploy()">
+                <span id="deployBtnText">🚀 开始智能部署</span>
+            </button>
+            <div class="progress-container" id="deployProgress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="deployProgressFill" style="width: 0%"></div>
+                </div>
+                <div class="progress-text">
+                    <span id="deployStatus">准备中...</span>
+                    <span id="deployPercent">0%</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 已安装模型 -->
+        <div class="installed-section" id="installedSection" style="display: none;">
+            <h3>📥 已安装的模型</h3>
+            <div class="models-grid" id="installedModels"></div>
+        </div>
+        
+        <!-- 模型市场 -->
+        <div id="modelsSection">
+            <div class="tabs">
+                <button class="tab active" onclick="switchModelTab('recommended')">推荐</button>
+                <button class="tab" onclick="switchModelTab('all')">全部</button>
+                <button class="tab" onclick="switchModelTab('tiny')">微型 (&lt;1B)</button>
+                <button class="tab" onclick="switchModelTab('small')">小型 (1-3B)</button>
+                <button class="tab" onclick="switchModelTab('medium')">中型 (3-7B)</button>
+                <button class="tab" onclick="switchModelTab('large')">大型 (7B+)</button>
+            </div>
+            
+            <div class="search-box">
+                <input type="text" placeholder="🔍 搜索模型..." id="searchInput" oninput="searchModels()">
+            </div>
+            
+            <div class="models-grid" id="modelsGrid"></div>
+        </div>
+        
+        <!-- 设置页面 -->
+        <div id="settingsSection" style="display: none;">
+            <h2 style="margin-bottom: 1.5rem;">⚙️ 设置</h2>
+            
+            <div class="info-card" style="margin-bottom: 1rem;">
+                <h3>📁 模型存储路径</h3>
+                <p style="color: var(--text-secondary); margin-top: 0.5rem;" id="modelPath">加载中...</p>
+            </div>
+            
+            <div class="info-card">
+                <h3>🌐 API 端口</h3>
+                <input type="number" value="8000" style="margin-top: 0.5rem; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);" id="apiPort">
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast 提示 -->
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        // 全局状态
+        let allModels = [];
+        let installedModels = [];
+        let currentTab = 'recommended';
+        let downloadingModels = new Set();
+        
+        // API 基础URL
+        const API_BASE = '/api';
+        
+        // 初始化
+        async function init() {
+            await loadSystemInfo();
+            await loadModels();
+            await loadInstalledModels();
+            startProgressPolling();
+        }
+        
+        // 加载系统信息
+        async function loadSystemInfo() {
+            try {
+                const res = await fetch(`${API_BASE}/system/info`);
+                const data = await res.json();
+                
+                if (data.code === 0) {
+                    const info = data.data;
+                    document.getElementById('osInfo').textContent = info.os;
+                    document.getElementById('memoryInfo').textContent = `${info.memory_gb} GB`;
+                    document.getElementById('gpuInfo').textContent = info.gpu_name || '未检测到';
+                    document.getElementById('installedCount').textContent = `${info.installed_models.length} 个`;
+                    document.getElementById('modelPath').textContent = info.models_dir;
+                    
+                    installedModels = info.installed_models;
+                    updateInstalledSection();
+                }
+            } catch (e) {
+                console.error('加载系统信息失败:', e);
+            }
+        }
+        
+        // 加载模型列表
+        async function loadModels() {
+            try {
+                const res = await fetch(`${API_BASE}/models/popular`);
+                const data = await res.json();
+                
+                if (data.code === 0) {
+                    allModels = data.data;
+                    renderModels();
+                }
+            } catch (e) {
+                console.error('加载模型列表失败:', e);
+            }
+        }
+        
+        // 加载已安装模型
+        async function loadInstalledModels() {
+            try {
+                const res = await fetch(`${API_BASE}/system/info`);
+                const data = await res.json();
+                
+                if (data.code === 0) {
+                    installedModels = data.data.installed_models;
+                    document.getElementById('installedCount').textContent = `${installedModels.length} 个`;
+                    updateInstalledSection();
+                }
+            } catch (e) {
+                console.error('加载已安装模型失败:', e);
+            }
+        }
+        
+        // 更新已安装模型区域
+        function updateInstalledSection() {
+            const section = document.getElementById('installedSection');
+            const grid = document.getElementById('installedModels');
+            
+            if (installedModels.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+            
+            section.style.display = 'block';
+            grid.innerHTML = installedModels.map(m => createModelCard(m, true)).join('');
+        }
+        
+        // 搜索模型
+        function searchModels() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            
+            if (!keyword) {
+                renderModels();
+                return;
+            }
+            
+            const filtered = allModels.filter(m => 
+                m.name.toLowerCase().includes(keyword) ||
+                m.description.toLowerCase().includes(keyword)
+            );
+            
+            renderModels(filtered);
+        }
+        
+        // 切换模型标签
+        function switchModelTab(tab) {
+            currentTab = tab;
+            
+            // 更新标签样式
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            renderModels();
+        }
+        
+        // 过滤并渲染模型
+        function renderModels(models = null) {
+            const grid = document.getElementById('modelsGrid');
+            let displayModels = models || allModels;
+            
+            // 根据标签过滤
+            if (!models) {
+                switch (currentTab) {
+                    case 'recommended':
+                        displayModels = allModels.filter(m => m.recommended);
+                        break;
+                    case 'tiny':
+                        displayModels = allModels.filter(m => m.params === '0.5B');
+                        break;
+                    case 'small':
+                        displayModels = allModels.filter(m => ['1.5B', '2B', '2.7B'].includes(m.params));
+                        break;
+                    case 'medium':
+                        displayModels = allModels.filter(m => ['3B', '7B'].includes(m.params));
+                        break;
+                    case 'large':
+                        displayModels = allModels.filter(m => ['8B', '13B', '70B'].includes(m.params));
+                        break;
+                }
+            }
+            
+            grid.innerHTML = displayModels.map(m => createModelCard(m)).join('');
+        }
+        
+        // 创建模型卡片
+        function createModelCard(model, isInstalled = false) {
+            const isDownloading = downloadingModels.has(model.id);
+            const installed = installedModels.find(m => m.id === model.id);
+            
+            let actionBtn = '';
+            if (isDownloading) {
+                actionBtn = `<button class="btn btn-warning" disabled><span class="spinner"></span> 下载中</button>`;
+            } else if (installed) {
+                if (installed.running) {
+                    actionBtn = `
+                        <button class="btn btn-danger" onclick="stopModel('${model.id}')">停止</button>
+                        <button class="btn btn-primary" onclick="testModel('${model.id}')">测试</button>
+                    `;
+                } else {
+                    actionBtn = `
+                        <button class="btn btn-success" onclick="startModel('${model.id}')">启动</button>
+                        <button class="btn btn-danger" onclick="confirmUninstall('${model.id}', '${model.name}')">卸载</button>
+                    `;
+                }
+            } else {
+                actionBtn = `<button class="btn btn-primary" onclick="installModel('${model.id}')">安装</button>`;
+            }
+            
+            let statusBadge = '';
+            if (installed) {
+                statusBadge = installed.running 
+                    ? '<span class="status-badge running"><span class="status-dot"></span> 运行中</span>'
+                    : '<span class="status-badge installed">✓ 已安装</span>';
+            }
+            
+            return `
+                <div class="model-card ${installed ? 'installed' : ''}">
+                    <div class="model-header">
+                        <div class="model-name">${model.name}</div>
+                        ${statusBadge}
+                        <span class="model-size">${model.params}</span>
+                    </div>
+                    <div class="model-desc">${model.description || ''}</div>
+                    <div class="model-meta">
+                        <span>📦 ${model.size}</span>
+                        <span>💾 ${model.memory}</span>
+                        <span>⚡ ${model.backend || 'llama.cpp'}</span>
+                    </div>
+                    <div class="model-actions">
+                        ${actionBtn}
+                    </div>
+                    ${isDownloading ? `
+                        <div class="progress-container active" id="progress-${model.id}">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill-${model.id}" style="width: 0%"></div>
+                            </div>
+                            <div class="progress-text">
+                                <span id="progressText-${model.id}">准备中...</span>
+                                <span id="progressPercent-${model.id}">0%</span>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+        
+        // 一键部署
+        async function autoDeploy() {
+            const btn = document.getElementById('deployBtnText');
+            const progressContainer = document.getElementById('deployProgress');
+            
+            btn.innerHTML = '<span class="spinner"></span> 部署中...';
+            btn.disabled = true;
+            progressContainer.classList.add('active');
+            
+            try {
+                const res = await fetch(`${API_BASE}/deploy/auto`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const data = await res.json();
+                
+                if (data.code === 0) {
+                    downloadingModels.add('auto_deploy');
+                    showToast('开始下载模型，请耐心等待...', 'success');
+                } else {
+                    showToast(data.message || '部署失败', 'error');
+                    btn.innerHTML = '🚀 开始智能部署';
+                    btn.disabled = false;
+                    progressContainer.classList.remove('active');
+                }
+            } catch (e) {
+                showToast('部署失败: ' + e.message, 'error');
+                btn.innerHTML = '🚀 开始智能部署';
+                btn.disabled = false;
+                progressContainer.classList.remove('active');
+            }
+        }
+        
+        // 安装模型
+        async function installModel(modelId) {
+            try {
+                downloadingModels.add(modelId);
+                renderModels();
+                
+                const res = await fetch(`${API_BASE}/models/install`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({model_id: modelId})
+                });
+                
+                const data = await res.json();
+                
+                if (data.code === 0) {
+                    showToast('开始下载模型...', 'success');
+                } else {
+                    downloadingModels.delete(modelId);
+                    showToast(data.message || '安装失败', 'error');
+                    renderModels();
+                }
+            } catch (e) {
+                downloadingModels.delete(modelId);
+                showToast('安装失败: ' + e.message, 'error');
+                renderModels();
+            }
+        }
+        
+        // 卸载模型
+        async function uninstallModel(modelId) {
+            try {
+                const res = await fetch(`${API_BASE}/models/uninstall`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({model_id: modelId})
+                });
+                
+                const data = await res.json();
+                
+                if (data.code === 0) {
+                    installedModels = installedModels.filter(m => m.id !== modelId);
+                    document.getElementById('installedCount').textContent = `${installedModels.length} 个`;
+                    updateInstalledSection();
+                    renderModels();
+                    showToast('卸载成功', 'success');
+                } else {
+                    showToast(data.message || '卸载失败', 'error');
+                }
+            } catch (e) {
+                showToast('卸载失败: ' + e.message, 'error');
+            }
+        }
+        
+        // 启动模型
+        async function startModel(modelId) {
+            const port = document.getElementById('apiPort').value;
+            
+            try {
+                const res = await fetch(`${API_BASE}/models/start`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({model_id: modelId, port: parseInt(port)})
+                });
+                
+                const data = await res.json();
+                
+                if (data.code === 0) {
+                    const model = installedModels.find(m => m.id === modelId);
+                    if (model) model.running = true;
+                    updateInstalledSection();
+                    renderModels();
+                    showToast(`模型已启动，API: http://localhost:${port}/v1`, 'success');
+                } else {
+                    showToast(data.message || '启动失败', 'error');
+                }
+            } catch (e) {
+                showToast('启动失败: ' + e.message, 'error');
+            }
+        }
+        
+        // 停止模型
+        async function stopModel(modelId) {
+            try {
+                const res = await fetch(`${API_BASE}/models/stop`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({model_id: modelId})
+                });
+                
+                const data = await res.json();
+                
+                if (data.code === 0) {
+                    const model = installedModels.find(m => m.id === modelId);
+                    if (model) model.running = false;
+                    updateInstalledSection();
+                    renderModels();
+                    showToast('模型已停止', 'success');
+                } else {
+                    showToast(data.message || '停止失败', 'error');
+                }
+            } catch (e) {
+                showToast('停止失败: ' + e.message, 'error');
+            }
+        }
+        
+        // 测试模型
+        function testModel(modelId) {
+            const port = document.getElementById('apiPort').value;
+            window.open(`http://localhost:${port}/docs`, '_blank');
+        }
+        
+        // 确认卸载弹窗
+        function confirmUninstall(modelId, modelName) {
+            if (confirm(`确定要卸载 ${modelName} 吗？`)) {
+                uninstallModel(modelId);
+            }
+        }
+        
+        // 轮询下载进度
+        function startProgressPolling() {
+            setInterval(async () => {
+                for (const modelId of downloadingModels) {
+                    try {
+                        const res = await fetch(`${API_BASE}/models/progress/${modelId}`);
+                        const data = await res.json();
+                        
+                        if (data.code === 0) {
+                            const progress = data.data;
+                            
+                            if (progress.status === 'downloading') {
+                                const fill = document.getElementById(`progressFill-${modelId}`);
+                                const text = document.getElementById(`progressText-${modelId}`);
+                                const percent = document.getElementById(`progressPercent-${modelId}`);
+                                
+                                if (fill) fill.style.width = `${progress.progress}%`;
+                                if (text) text.textContent = progress.speed || '下载中...';
+                                if (percent) percent.textContent = `${progress.progress}%`;
+                                
+                                // 更新一键部署进度
+                                if (modelId === 'auto_deploy') {
+                                    document.getElementById('deployProgressFill').style.width = `${progress.progress}%`;
+                                    document.getElementById('deployStatus').textContent = progress.speed || '下载中...';
+                                    document.getElementById('deployPercent').textContent = `${progress.progress}%`;
+                                }
+                            } else if (progress.status === 'completed') {
+                                downloadingModels.delete(modelId);
+                                await loadInstalledModels();
+                                renderModels();
+                                
+                                // 重置一键部署按钮
+                                if (modelId === 'auto_deploy') {
+                                    document.getElementById('deployBtnText').innerHTML = '🚀 开始智能部署';
+                                    document.getElementById('deployBtnText').disabled = false;
+                                    document.getElementById('deployProgress').classList.remove('active');
+                                }
+                                
+                                showToast('模型下载完成！', 'success');
+                            } else if (progress.status === 'failed') {
+                                downloadingModels.delete(modelId);
+                                renderModels();
+                                showToast('下载失败: ' + (progress.error || '未知错误'), 'error');
+                                
+                                if (modelId === 'auto_deploy') {
+                                    document.getElementById('deployBtnText').innerHTML = '🚀 开始智能部署';
+                                    document.getElementById('deployBtnText').disabled = false;
+                                    document.getElementById('deployProgress').classList.remove('active');
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('获取进度失败:', e);
+                    }
+                }
+            }, 1000);
+        }
+        
+        // 切换标签页
+        function showTab(tab) {
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('modelsSection').style.display = tab === 'models' || tab === 'installed' ? 'block' : 'none';
+            document.getElementById('settingsSection').style.display = tab === 'settings' ? 'block' : 'none';
+            document.getElementById('quickDeploy').style.display = tab !== 'settings' ? 'block' : 'none';
+            
+            if (tab === 'installed') {
+                updateInstalledSection();
+            }
+        }
+        
+        // 显示 Toast
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // 启动
+        init();
+    </script>
+</body>
+</html>
