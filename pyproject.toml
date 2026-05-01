@@ -55,12 +55,8 @@ Documentation = "https://lightllm.readthedocs.io"
 Repository = "https://github.com/lightllm/lightllm"
 Issues = "https://github.com/lightllm/lightllm/issues"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
-
-[tool.setuptools.package-dir]
-"" = "src"
+[tool.setuptools]
+packages = ["src", "src.core", "src.api"]
 
 [tool.black]
 line-length = 100
