@@ -31,14 +31,14 @@ def test_skills_optimizer():
         # Test register skill with correct params
         skill = Skill(
             name="test_skill",
-            type=SkillType.CUSTOM,
+            type=SkillType.TOOL,
             description="A test skill"
         )
-        optimizer.register_skill(skill)
+        optimizer.register(skill)
         print(f"[OK] Skill registered: {skill.name}")
 
         # Test stats
-        stats = optimizer.get_stats()
+        stats = optimizer.get_statistics()
         print(f"[OK] Stats: {stats}")
 
         # Test GitHub optimizer
@@ -68,8 +68,8 @@ def test_context_compressor():
         # Test token budgeting
         from optimizer.skills_optimizer import TokenBudget
         budget = TokenBudget(max_tokens=1000)
-        budget.allocate(100, "test")
-        print(f"[OK] TokenBudget: remaining={budget.get_remaining()}")
+        budget.allocate(100)
+        print(f"[OK] TokenBudget: available={budget.get_available()}")
 
         # Test compression (simple)
         print(f"[OK] ContextCompressor created")
@@ -115,21 +115,17 @@ def test_agent_bridge():
     try:
         from agent.bridge import AgentBridge, AgentConfig, AgentProtocol, create_openclaw_bridge
 
-        # Test bridge creation
-        bridge = AgentBridge()
+        # Test bridge creation with config
+        config = AgentConfig(
+            name="test_agent",
+            protocol=AgentProtocol.OPENCLAW,
+            endpoint="http://localhost:8080"
+        )
+        bridge = AgentBridge(config=config)
         print(f"[OK] AgentBridge created")
 
-        # Test agent registration
-        config = AgentConfig(
-            protocol=AgentProtocol.OPENCLAW,
-            host="localhost",
-            port=8080
-        )
-        bridge.register_agent("test_agent", config)
-        print(f"[OK] Agent registered: {bridge.agents['test_agent'].protocol.value}")
-
         # Test convenience function
-        openclaw = create_openclaw_bridge("localhost", 8080)
+        openclaw = create_openclaw_bridge("openclaw_agent", "http://localhost:8080")
         print(f"[OK] OpenClaw bridge created")
 
         return True
