@@ -142,18 +142,18 @@ def download_model():
     data = request.json
     model_id = data.get('model_id')
     quantize = data.get('quantize')
-    
+
     if not model_id:
         return jsonify({"success": False, "error": "model_id is required"})
-    
+
     config = ModelCatalog.get_model(model_id)
     if not config:
         return jsonify({"success": False, "error": "Model not found"})
-    
+
     # 检查是否已在下载中
     if model_id in download_tasks:
         return jsonify({"success": False, "error": "Model is already downloading"})
-    
+
     def progress_callback(progress):
         download_tasks[model_id] = {
             "downloaded": progress.downloaded,
@@ -162,7 +162,7 @@ def download_model():
             "speed": progress.speed,
             "status": progress.status
         }
-    
+
     def download_thread():
         try:
             downloader = ModelDownloader(progress_callback=progress_callback)
@@ -176,11 +176,11 @@ def download_model():
                 "status": "failed",
                 "error": str(e)
             }
-    
+
     thread = threading.Thread(target=download_thread)
     thread.daemon = True
     thread.start()
-    
+
     return jsonify({
         "success": True,
         "message": "开始下载 " + config.name,
@@ -209,10 +209,10 @@ def delete_model():
     """删除模型"""
     data = request.json
     model_id = data.get('model_id')
-    
+
     if not model_id:
         return jsonify({"success": False, "error": "model_id is required"})
-    
+
     try:
         downloader = ModelDownloader()
         success = downloader.delete(model_id)
@@ -241,30 +241,30 @@ def start_model():
     data = request.json
     model_id = data.get('model_id')
     port = data.get('port', DEFAULT_MODEL_DIR)
-    
+
     if not model_id:
         return jsonify({"success": False, "error": "model_id is required"})
-    
+
     if model_id in running_models:
         return jsonify({"success": False, "error": "Model is already running"})
-    
+
     config = ModelCatalog.get_model(model_id)
     if not config:
         return jsonify({"success": False, "error": "Model not found"})
-    
+
     # 检查模型是否已安装
     downloader = ModelDownloader()
     installed = downloader.list_installed()
-    
+
     model_path = None
     for m in installed:
         if m["config"] and m["config"]["id"] == model_id:
             model_path = m["path"]
             break
-    
+
     if not model_path:
         return jsonify({"success": False, "error": "Model not installed"})
-    
+
     # 启动服务
     def run_thread():
         try:
@@ -281,11 +281,11 @@ def start_model():
             if model_id in running_models:
                 del running_models[model_id]
             print("Error running model: " + str(e))
-    
+
     thread = threading.Thread(target=run_thread)
     thread.daemon = True
     thread.start()
-    
+
     return jsonify({
         "success": True,
         "message": "已启动 " + config.name,
@@ -297,13 +297,13 @@ def stop_model():
     """停止模型服务"""
     data = request.json
     model_id = data.get('model_id')
-    
+
     if not model_id:
         return jsonify({"success": False, "error": "model_id is required"})
-    
+
     if model_id not in running_models:
         return jsonify({"success": False, "error": "Model is not running"})
-    
+
     try:
         engine = running_models[model_id]
         engine.stop()

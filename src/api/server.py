@@ -48,7 +48,7 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: int = Field(default=2048, ge=1, le=32768, description="最大生成长度")
     stream: bool = Field(default=True, description="是否流式输出")
     stop: Optional[List[str]] = Field(default=None, description="停止词")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -141,14 +141,14 @@ async def list_models():
             id=name,
             owned_by=info.get("repo", "unknown"),
         ))
-    
+
     # 添加已加载的自定义模型
     if current_engine and current_engine.model_path:
         models.append(ModelInfo(
             id="current",
             owned_by="custom",
         ))
-    
+
     return {
         "object": "list",
         "data": [m.model_dump() for m in models]
@@ -159,23 +159,23 @@ async def list_models():
 async def chat_completions(request: ChatCompletionRequest):
     """Chat Completion API - OpenAI 兼容"""
     global current_engine
-    
+
     if not app_state["loaded"] or not current_engine:
         raise HTTPException(status_code=503, detail="Model not loaded. Call /load first.")
-    
+
     # 提取 system 和 user 消息
     system_prompt = None
     user_prompt = None
-    
+
     for msg in request.messages:
         if msg.role == "system":
             system_prompt = msg.content
         elif msg.role == "user":
             user_prompt = msg.content
-    
+
     if not user_prompt:
         raise HTTPException(status_code=400, detail="No user message found")
-    
+
     generation_config = GenerationConfig(
         max_tokens=request.max_tokens,
         temperature=request.temperature,
@@ -183,7 +183,7 @@ async def chat_completions(request: ChatCompletionRequest):
         stop=request.stop or ["</s>", "<|endoftext|>"],
         stream=request.stream,
     )
-    
+
     if request.stream:
         return StreamingResponse(
             _stream_chat_response(current_engine, user_prompt, system_prompt, generation_config, request.model),
@@ -195,7 +195,7 @@ async def chat_completions(request: ChatCompletionRequest):
         async for result in current_engine.generate(user_prompt, system_prompt, generation_config):
             if result.content:
                 full_response += result.content
-        
+
         return {
             "id": f"chatcmpl-{int(time.time())}",
             "object": "chat.completion",
@@ -228,9 +228,9 @@ async def _stream_chat_response(
     response_id = f"chatcmpl-{int(time.time())}"
     created = int(time.time())
     first_chunk = True
-    
+
     yield f"event: chunk\n"
-    
+
     async for result in engine.generate(prompt, system, config):
         if first_chunk:
             # 首块包含完整的响应头
@@ -249,7 +249,7 @@ async def _stream_chat_response(
         else:
             chunk_data = {
                 "id": response_id,
-                "object": "chat.completion.chunk", 
+                "object": "chat.completion.chunk",
                 "created": created,
                 "model": model_id,
                 "choices": [{
@@ -258,9 +258,9 @@ async def _stream_chat_response(
                     "finish_reason": None,
                 }]
             }
-        
+
         yield f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
-        
+
         if result.done:
             # 发送结束信号
             end_data = {
@@ -283,10 +283,10 @@ async def _stream_chat_response(
 async def completions(request: CompletionRequest):
     """Completion API - OpenAI 兼容"""
     global current_engine
-    
+
     if not app_state["loaded"] or not current_engine:
         raise HTTPException(status_code=503, detail="Model not loaded")
-    
+
     generation_config = GenerationConfig(
         max_tokens=request.max_tokens,
         temperature=request.temperature,
@@ -294,7 +294,7 @@ async def completions(request: CompletionRequest):
         stop=request.stop,
         stream=request.stream,
     )
-    
+
     if request.stream:
         return StreamingResponse(
             _stream_completion_response(current_engine, request.prompt, generation_config),
@@ -305,7 +305,7 @@ async def completions(request: CompletionRequest):
         async for result in current_engine.generate(request.prompt, None, generation_config):
             if result.content:
                 full_response += result.content
-        
+
         return {
             "id": f"cmpl-{int(time.time())}",
             "object": "text_completion",
@@ -329,7 +329,7 @@ async def _stream_completion_response(
         if result.done:
             yield "data: [DONE]\n\n"
             break
-        
+
         chunk = {
             "id": f"cmpl-{int(time.time())}",
             "object": "text_completion",
@@ -350,12 +350,12 @@ async def load_model(
 ):
     """加载模型"""
     global model_manager, current_engine
-    
+
     logger.info(f"Loading model: {model} (backend: {backend})")
-    
+
     # 确定模型路径
     model_path = None
-    
+
     # 检查预设模型
     if model in PRESET_MODELS:
         preset = PRESET_MODELS[model]
@@ -364,38 +364,38 @@ async def load_model(
         matches = glob(str(model_dir / "*.gguf"))
         if matches:
             model_path = matches[0]
-    
+
     # 检查自定义路径
     if not model_path and Path(model).exists():
         model_path = model
-    
+
     if not model_path:
         raise HTTPException(
             status_code=404,
             detail=f"Model not found: {model}. Use /download to download first."
         )
-    
+
     # 创建引擎
     backend_type = BackendType(backend)
     from config import create_backend_config
-    
+
     config = create_backend_config(backend_type)
-    
+
     engine = LLMEngine(
         model_path=model_path,
         backend=backend_type,
         config=config,
     )
-    
+
     # 加载
     success = await engine.load()
-    
+
     if success:
         current_engine = engine
         app_state["loaded"] = True
         app_state["model_name"] = model
         app_state["model_path"] = model_path
-        
+
         return {
             "status": "success",
             "model": model,
@@ -410,14 +410,14 @@ async def load_model(
 async def unload_model():
     """卸载模型"""
     global current_engine
-    
+
     if current_engine:
         await current_engine.unload()
         current_engine = None
         app_state["loaded"] = False
         app_state["model_name"] = None
         app_state["model_path"] = None
-    
+
     return {"status": "success", "message": "Model unloaded"}
 
 
@@ -436,12 +436,12 @@ async def download_model(model: str = "phi-2"):
     """下载模型"""
     if model not in PRESET_MODELS:
         raise HTTPException(status_code=404, detail=f"Unknown model: {model}")
-    
+
     preset = PRESET_MODELS[model]
-    
+
     # 异步下载
     asyncio.create_task(_download_model_async(model, preset))
-    
+
     return {
         "status": "downloading",
         "model": model,
@@ -453,22 +453,22 @@ async def _download_model_async(model: str, preset: Dict):
     """异步下载模型"""
     from huggingface_hub import hf_hub_download
     from pathlib import Path
-    
+
     logger.info(f"Starting download: {preset['name']}")
-    
+
     try:
         model_dir = MODEL_CACHE_DIR / model
         model_dir.mkdir(parents=True, exist_ok=True)
-        
+
         local_path = hf_hub_download(
             repo_id=preset["repo"],
             filename=preset["file"],
             local_dir=model_dir,
             local_dir_use_symlinks=False,
         )
-        
+
         logger.info(f"Download complete: {local_path}")
-        
+
     except Exception as e:
         logger.error(f"Download failed: {e}")
 
@@ -490,13 +490,13 @@ def main():
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
     parser.add_argument("--model", default=None, help="Model to load on startup")
     parser.add_argument("--backend", default="llama_cpp", choices=["llama_cpp", "vllm", "ctransformers"])
-    
+
     args = parser.parse_args()
-    
+
     # 预加载模型
     if args.model:
         asyncio.run(load_model(args.model, args.backend))
-    
+
     uvicorn.run(
         "src.api.server:app",
         host=args.host,

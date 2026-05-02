@@ -62,10 +62,10 @@ class ModelConfig:
     description: str = ""
     tags: List[str] = field(default_factory=list)
     image_model: bool = False    # 是否是图像模型
-    
+
     def to_dict(self) -> Dict:
         return asdict(self)
-    
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'ModelConfig':
         if isinstance(data.get('source'), str):
@@ -84,7 +84,7 @@ class DownloadProgress:
     speed_mbps: float = 0
     progress_percent: float = 0
     status: str = "pending"  # pending, downloading, completed, failed
-    
+
     def percent(self) -> float:
         if self.total_mb > 0:
             return round(self.downloaded_mb / self.total_mb * 100, 1)
@@ -93,7 +93,7 @@ class DownloadProgress:
 
 class ModelCatalog:
     """模型目录"""
-    
+
     @classmethod
     def get_all_models(cls) -> Dict[str, ModelConfig]:
         """获取所有模型"""
@@ -101,7 +101,7 @@ class ModelCatalog:
         models.update(cls.get_llm_models())
         models.update(cls.get_image_models())
         return models
-    
+
     @classmethod
     def get_llm_models(cls) -> Dict[str, ModelConfig]:
         """获取 LLM 模型"""
@@ -350,24 +350,24 @@ class ModelCatalog:
                 tags=["自定义", "本地"]
             ),
         }
-    
+
     @classmethod
     def get_image_models(cls) -> Dict[str, ModelConfig]:
         """获取图像生成模型"""
         return {k: v for k, v in cls.get_llm_models().items() if v.image_model}
-    
+
     @classmethod
     def get_by_source(cls, source: ModelSource) -> Dict[str, ModelConfig]:
         """按来源获取模型"""
         return {k: v for k, v in cls.get_all_models().items() if v.source == source}
-    
+
     @classmethod
     def search(cls, query: str) -> List[ModelConfig]:
         """搜索模型"""
         query = query.lower()
         results = []
         for model in cls.get_all_models().values():
-            if (query in model.name.lower() or 
+            if (query in model.name.lower() or
                 query in model.description.lower() or
                 any(query in tag.lower() for tag in model.tags)):
                 results.append(model)
@@ -376,16 +376,16 @@ class ModelCatalog:
 
 class ModelDownloader:
     """模型下载器"""
-    
+
     def __init__(self, model_dir: Path = None):
         self.model_dir = model_dir or DEFAULT_MODEL_DIR
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self.progress_callback: Optional[Callable] = None
-    
+
     def set_progress_callback(self, callback: Callable):
         """设置进度回调"""
         self.progress_callback = callback
-    
+
     def _report_progress(self, model_id: str, downloaded: float, total: float, speed: float = 0):
         """报告进度"""
         if self.progress_callback:
@@ -397,7 +397,7 @@ class ModelDownloader:
                 status="downloading"
             )
             self.progress_callback(progress)
-    
+
     def download(self, model_config: ModelConfig) -> Path:
         """下载模型"""
         if model_config.source == ModelSource.HUGGINGFACE:
@@ -414,7 +414,7 @@ class ModelDownloader:
             raise ValueError("本地模型不需要下载")
         else:
             raise ValueError(f"不支持的来源: {model_config.source}")
-    
+
     def _download_huggingface(self, model: ModelConfig) -> Path:
         """从 HuggingFace 下载"""
         try:
@@ -422,14 +422,14 @@ class ModelDownloader:
         except ImportError:
             print("需要安装 huggingface_hub: pip install huggingface_hub")
             raise
-        
+
         print(f"从 HuggingFace 下载: {model.name}")
         print(f"仓库: {model.repo_id}")
-        
+
         # 获取文件列表
         files = list_repo_files(model.repo_id)
         print(f"仓库文件: {files[:5]}...")
-        
+
         # 查找匹配的文件
         target_file = None
         for f in files:
@@ -437,28 +437,28 @@ class ModelDownloader:
                 if any(q in f for q in ["Q2", "Q3", "Q4", "Q5", "Q6", "Q8", "FP16"]):
                     target_file = f
                     break
-        
+
         if not target_file:
             # 使用默认的 Q4_K_M 文件
             for f in files:
                 if "Q4_K_M" in f:
                     target_file = f
                     break
-        
+
         if not target_file:
             raise ValueError(f"未找到合适的 GGUF 文件: {model.repo_id}")
-        
+
         print(f"下载文件: {target_file}")
-        
+
         output_path = hf_hub_download(
             repo_id=model.repo_id,
             filename=target_file,
             local_dir=self.model_dir / model.id,
             local_dir_use_symlinks=False
         )
-        
+
         return Path(output_path)
-    
+
     def _download_modelscope(self, model: ModelConfig) -> Path:
         """从 ModelScope 下载"""
         try:
@@ -466,55 +466,55 @@ class ModelDownloader:
         except ImportError:
             print("需要安装 modelscope: pip install modelscope")
             raise
-        
+
         print(f"从 ModelScope 下载: {model.name}")
-        
+
         cache_dir = str(self.model_dir / model.id)
         output_path = snapshot_download(
             model_id=model.repo_id,
             cache_dir=cache_dir
         )
-        
+
         return Path(output_path)
-    
+
     def _download_civitai(self, model: ModelConfig) -> Path:
         """从 Civitai 下载"""
         # Civitai 需要 API key 或者直接下载
         print(f"从 Civitai 下载: {model.name}")
         print(f"模型ID: {model.repo_id}")
         print("提示: Civitai 模型较大，建议使用 HuggingFace 镜像版本")
-        
+
         # 提示用户手动下载
         print(f"请访问 https://civitai.com/models/{model.repo_id} 下载")
         raise NotImplementedError("Civitai 下载需要手动操作，请使用 HuggingFace 版本")
-    
+
     def _download_ollama(self, model: ModelConfig) -> Path:
         """通过 Ollama 下载"""
         print(f"通过 Ollama 下载: {model.name}")
-        
+
         # 检查 Ollama 是否安装
         try:
             subprocess.run(["ollama", "--version"], capture_output=True, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
             print("Ollama 未安装，请先安装: https://ollama.com/download")
             raise
-        
+
         # 提取模型名称（去掉 :latest）
         ollama_model = model.repo_id.replace(":latest", "")
-        
+
         print(f"执行: ollama pull {ollama_model}")
         result = subprocess.run(
             ["ollama", "pull", ollama_model],
             capture_output=True,
             text=True
         )
-        
+
         if result.returncode != 0:
             raise RuntimeError(f"Ollama 下载失败: {result.stderr}")
-        
+
         # 返回 Ollama 模型路径
         return Path(f"ollama://{ollama_model}")
-    
+
     def list_installed(self) -> List[Dict]:
         """列出已安装的模型"""
         installed = []
@@ -522,10 +522,10 @@ class ModelDownloader:
             if model_dir.is_dir():
                 files = list(model_dir.glob("*"))
                 total_size = sum(f.stat().st_size for f in files if f.is_file())
-                
+
                 # 尝试匹配模型配置
                 model_config = ModelCatalog.get_all_models().get(model_dir.name)
-                
+
                 installed.append({
                     "id": model_dir.name,
                     "path": str(model_dir),
@@ -534,7 +534,7 @@ class ModelDownloader:
                     "config": model_config.to_dict() if model_config else None
                 })
         return installed
-    
+
     def remove(self, model_id: str) -> bool:
         """删除已安装的模型"""
         model_path = self.model_dir / model_id
@@ -573,10 +573,10 @@ def get_model_info(model_id: str) -> Optional[Dict]:
 def get_system_info() -> Dict:
     """获取系统信息"""
     import psutil
-    
+
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage('C:\\' if os.name == 'nt' else '/')
-    
+
     return {
         "memory_total_gb": round(memory.total / 1024**3, 1),
         "memory_available_gb": round(memory.available / 1024**3, 1),
@@ -591,7 +591,7 @@ def get_recommended_models(sys_info: Dict) -> List[Dict]:
     """根据系统配置推荐模型"""
     available_mem = sys_info.get("memory_available_gb", 8)
     recommended = []
-    
+
     for model in ModelCatalog.get_all_models().values():
         if not model.image_model:  # 只推荐 LLM
             mem_required = model.min_memory_mb / 1024
@@ -600,7 +600,7 @@ def get_recommended_models(sys_info: Dict) -> List[Dict]:
                     "model": model,
                     "reason": f"需要 {mem_required:.0f}GB 内存，可用 {available_mem:.1f}GB"
                 })
-    
+
     # 按内存需求排序
     recommended.sort(key=lambda x: x["model"].min_memory_mb)
     return recommended
@@ -615,15 +615,15 @@ def main():
     parser.add_argument("--source", "-s", help="模型来源 (hf/ms/cs/ollama)")
     parser.add_argument("--list-sources", action="store_true", help="列出支持的来源")
     parser.add_argument("--list-all", action="store_true", help="列出所有模型(不含搜索)")
-    
+
     args = parser.parse_args()
-    
+
     if args.list_sources:
         print("\n支持的模型来源:")
         for source in ModelSource:
             print(f"  {source.value}: {source.name}")
         return 0
-    
+
     if args.action == "list":
         if args.list_all:
             # 列出所有模型
@@ -649,7 +649,7 @@ def main():
                 source_map = {"hf": ModelSource.HUGGINGFACE, "ms": ModelSource.MODELSCOPE,
                               "cs": ModelSource.CIVITAI, "ollama": ModelSource.OLLAMA}
                 source_filter = source_map.get(args.source)
-            
+
             print(f"\n📦 模型目录{' (来源: ' + args.source + ')' if args.source else ''}:\n")
             models = ModelCatalog.get_all_models() if not source_filter else ModelCatalog.get_by_source(source_filter)
             for m in models.values():
@@ -664,7 +664,7 @@ def main():
                 print(f"{source_icon} {m.name}")
                 print(f"   ID: {m.id} | 大小: {m.size_mb/1024:.1f} GB")
                 print()
-    
+
     elif args.action == "search":
         query = args.model or input("输入搜索关键词: ")
         results = ModelCatalog.search(query)
@@ -672,7 +672,7 @@ def main():
         for m in results:
             print(f"  • {m.name} ({m.id})")
             print(f"    {m.description}\n")
-    
+
     elif args.action == "info":
         if not args.model:
             print("请指定模型ID: --model <id>")
@@ -689,7 +689,7 @@ def main():
             print(f"   标签: {', '.join(info['tags'])}")
         else:
             print(f"未找到模型: {args.model}")
-    
+
     elif args.action == "installed":
         downloader = ModelDownloader()
         installed = downloader.list_installed()
@@ -701,23 +701,23 @@ def main():
             print(f"  • {m['id']} ({size_gb:.2f} GB)")
             print(f"    路径: {m['path']}")
             print()
-    
+
     elif args.action == "install":
         if not args.model:
             print("请指定模型ID: --model <id>")
             return 1
-        
+
         models = ModelCatalog.get_all_models()
         if args.model not in models:
             print(f"未找到模型: {args.model}")
             print("使用 'python -m src.model_manager list --list-all' 查看所有模型")
             return 1
-        
+
         model_config = models[args.model]
         print(f"\n🚀 开始安装: {model_config.name}")
         print(f"   来源: {model_config.source.value}")
         print(f"   大小: {model_config.size_mb/1024:.1f} GB\n")
-        
+
         downloader = ModelDownloader()
         try:
             path = downloader.download(model_config)
@@ -725,12 +725,12 @@ def main():
         except Exception as e:
             print(f"\n❌ 安装失败: {e}")
             return 1
-    
+
     elif args.action == "remove":
         if not args.model:
             print("请指定模型ID: --model <id>")
             return 1
-        
+
         confirm = input(f"确认删除模型 '{args.model}'? (y/N): ")
         if confirm.lower() == 'y':
             downloader = ModelDownloader()
@@ -738,13 +738,13 @@ def main():
                 print("✅ 删除成功")
             else:
                 print("❌ 删除失败，模型可能不存在")
-    
+
     elif args.action == "recommend":
         sys_info = get_system_info()
         print(f"\n💻 系统配置:")
         print(f"   内存: {sys_info['memory_available_gb']:.1f} GB / {sys_info['memory_total_gb']:.1f} GB")
         print(f"   CPU: {sys_info['cpu_count']} 核心\n")
-        
+
         recommendations = get_recommended_models(sys_info)
         print("📋 推荐的模型:\n")
         for i, rec in enumerate(recommendations[:5], 1):
@@ -752,7 +752,7 @@ def main():
             print(f"  {i}. {m.name}")
             print(f"     {rec['reason']}")
             print()
-    
+
     return 0
 
 

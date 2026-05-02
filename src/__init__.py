@@ -11,7 +11,7 @@ from .model_converter import ModelConverter, list_supported_formats
 
 __all__ = [
     "ModelDownloader",
-    "ModelCatalog", 
+    "ModelCatalog",
     "list_popular_models",
     "get_model_info",
     "get_system_info",

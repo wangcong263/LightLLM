@@ -54,28 +54,28 @@ class StreamResult:
 
 class ModelBackend:
     """模型后端基类"""
-    
+
     def __init__(self, model_path: str, **kwargs):
         self.model_path = model_path
         self.model = None
         self.tokenizer = None
-    
+
     async def load(self) -> None:
         """加载模型"""
         raise NotImplementedError
-    
+
     async def unload(self) -> None:
         """卸载模型"""
         raise NotImplementedError
-    
+
     async def generate(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         config: GenerationConfig
     ) -> AsyncIterator[StreamResult]:
         """生成文本"""
         raise NotImplementedError
-    
+
     @property
     def is_loaded(self) -> bool:
         return self.model is not None
@@ -83,7 +83,7 @@ class ModelBackend:
 
 class LlamaCppBackend(ModelBackend):
     """llama.cpp 后端"""
-    
+
     def __init__(self, model_path: str, **kwargs):
         super().__init__(model_path)
         self.n_ctx = kwargs.get("n_ctx", 4096)
@@ -91,7 +91,7 @@ class LlamaCppBackend(ModelBackend):
         self.verbose = kwargs.get("verbose", False)
         self._llama = None
         self._tokenizer = None
-    
+
     async def load(self) -> None:
         """加载 llama.cpp 模型"""
         try:
@@ -101,25 +101,25 @@ class LlamaCppBackend(ModelBackend):
             raise ImportError(
                 "llama-cpp-python 未安装。请运行: pip install llama-cpp-python"
             )
-        
+
         logger.info(f"Loading llama.cpp model from {self.model_path}")
-        
+
         self._llama = Llama(
             model_path=str(self.model_path),
             n_ctx=self.n_ctx,
             n_gpu_layers=self.n_gpu_layers,
             verbose=self.verbose,
         )
-        
+
         try:
             self._tokenizer = LlamaTokenizer(self._llama)
         except Exception:
             self._tokenizer = None
-        
+
         self.model = self._llama
         self.tokenizer = self._tokenizer
         logger.info("llama.cpp model loaded successfully")
-    
+
     async def unload(self) -> None:
         """卸载模型"""
         self.model = None
@@ -128,36 +128,36 @@ class LlamaCppBackend(ModelBackend):
         self._tokenizer = None
         import gc
         gc.collect()
-    
+
     async def generate(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         config: GenerationConfig
     ) -> AsyncIterator[StreamResult]:
         """llama.cpp 流式生成"""
-        
+
         if not self.model:
             raise RuntimeError("Model not loaded. Call load() first.")
-        
+
         if config.stream:
             async for result in self._stream_llama_cpp(prompt, config):
                 yield result
         else:
             result = await self._non_stream_llama_cpp(prompt, config)
             yield result
-    
+
     async def _stream_llama_cpp(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         config: GenerationConfig
     ) -> AsyncIterator[StreamResult]:
         """llama.cpp 流式生成实现"""
-        
+
         try:
             from llama_cpp import Llama
         except ImportError:
             raise ImportError("llama-cpp-python 未安装")
-        
+
         # 创建异步流式生成器
         def create_stream():
             return self._llama.create_completion(
@@ -171,11 +171,11 @@ class LlamaCppBackend(ModelBackend):
                 echo=False,
                 stream=True,
             )
-        
+
         # 在线程池中运行同步 llama.cpp 调用
         loop = asyncio.get_event_loop()
         stream = await loop.run_in_executor(None, create_stream)
-        
+
         content = ""
         for chunk in stream:
             if "choices" in chunk and len(chunk["choices"]) > 0:
@@ -186,17 +186,17 @@ class LlamaCppBackend(ModelBackend):
                         content=delta["content"],
                         done=False,
                     )
-        
+
         # 完成
         yield StreamResult(content="", done=True)
-    
+
     async def _non_stream_llama_cpp(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         config: GenerationConfig
     ) -> StreamResult:
         """llama.cpp 非流式生成"""
-        
+
         def create_completion():
             return self._llama(
                 prompt,
@@ -208,20 +208,20 @@ class LlamaCppBackend(ModelBackend):
                 echo=False,
                 stream=False,
             )
-        
+
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(None, create_completion)
-        
+
         content = ""
         if "choices" in result and len(result["choices"]) > 0:
             content = result["choices"][0].get("text", "")
-        
+
         return StreamResult(content=content, done=True)
 
 
 class VLLMBackend(ModelBackend):
     """vLLM 后端 (需要 NVIDIA GPU)"""
-    
+
     def __init__(self, model_path: str, **kwargs):
         super().__init__(model_path)
         self.tensor_parallel_size = kwargs.get("tensor_parallel_size", 1)
@@ -229,7 +229,7 @@ class VLLMBackend(ModelBackend):
         self.max_model_len = kwargs.get("max_model_len", 4096)
         self.port = kwargs.get("port", 8000)
         self._async_engine = None
-    
+
     async def load(self) -> None:
         """加载 vLLM 模型"""
         try:
@@ -238,9 +238,9 @@ class VLLMBackend(ModelBackend):
             raise ImportError(
                 "vllm 未安装。请运行: pip install vllm"
             )
-        
+
         logger.info(f"Loading vLLM model from {self.model_path}")
-        
+
         loop = asyncio.get_event_loop()
         self._async_engine = await loop.run_in_executor(
             None,
@@ -251,60 +251,60 @@ class VLLMBackend(ModelBackend):
                 max_model_len=self.max_model_len,
             )
         )
-        
+
         self.model = self._async_engine
         logger.info("vLLM model loaded successfully")
-    
+
     async def unload(self) -> None:
         """卸载模型"""
         self.model = None
         self._async_engine = None
         import gc
         gc.collect()
-    
+
     async def generate(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         config: GenerationConfig
     ) -> AsyncIterator[StreamResult]:
         """vLLM 流式生成"""
-        
+
         if not self.model:
             raise RuntimeError("Model not loaded. Call load() first.")
-        
+
         if config.stream:
             async for result in self._stream_vllm(prompt, config):
                 yield result
         else:
             result = await self._non_stream_vllm(prompt, config)
             yield result
-    
+
     async def _stream_vllm(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         config: GenerationConfig
     ) -> AsyncIterator[StreamResult]:
         """vLLM 流式生成"""
-        
+
         from vllm import SamplingParams
-        
+
         sampling_params = SamplingParams(
             max_tokens=config.max_tokens,
             temperature=config.temperature,
             top_p=config.top_p,
         )
-        
+
         # vLLM 的异步生成
         # 注意: vLLM 0.2.7+ 支持 async output
         loop = asyncio.get_event_loop()
-        
+
         # 使用同步接口（vLLM 当前版本的推荐方式）
         def generate_sync():
             outputs = self._async_engine.generate(prompt, sampling_params)
             return outputs
-        
+
         outputs = await loop.run_in_executor(None, generate_sync)
-        
+
         if outputs:
             output = outputs[0]
             for i, output_token in enumerate(output.outputs[0].token_ids):
@@ -316,47 +316,47 @@ class VLLMBackend(ModelBackend):
                         done=False,
                         token_id=output_token,
                     )
-        
+
         yield StreamResult(content="", done=True)
-    
+
     async def _non_stream_vllm(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         config: GenerationConfig
     ) -> StreamResult:
         """vLLM 非流式生成"""
-        
+
         from vllm import SamplingParams
-        
+
         sampling_params = SamplingParams(
             max_tokens=config.max_tokens,
             temperature=config.temperature,
             top_p=config.top_p,
         )
-        
+
         loop = asyncio.get_event_loop()
-        
+
         def generate_sync():
             outputs = self._async_engine.generate(prompt, sampling_params)
             return outputs
-        
+
         outputs = await loop.run_in_executor(None, generate_sync)
-        
+
         content = ""
         if outputs:
             content = outputs[0].outputs[0].output_str
-        
+
         return StreamResult(content=content, done=True)
 
 
 class CTransformersBackend(ModelBackend):
     """CTransformers (CTranslate2) 后端"""
-    
+
     def __init__(self, model_path: str, **kwargs):
         super().__init__(model_path)
         self.model_type = kwargs.get("model_type", "llama")
         self.lib_type = kwargs.get("lib_type", "cpu")
-    
+
     async def load(self) -> None:
         """加载 CTransformers 模型"""
         try:
@@ -365,48 +365,48 @@ class CTransformersBackend(ModelBackend):
             raise ImportError(
                 "ctransformers 未安装。请运行: pip install ctransformers"
             )
-        
+
         logger.info(f"Loading CTransformers model from {self.model_path}")
-        
+
         loop = asyncio.get_event_loop()
-        
+
         def load_model():
             return AutoModelForCausalLM.from_pretrained(
                 str(self.model_path),
                 model_type=self.model_type,
                 lib_type=self.lib_type,
             )
-        
+
         def load_tokenizer():
             try:
                 return AutoTokenizer.from_pretrained(str(self.model_path))
             except Exception:
                 return None
-        
+
         self.model = await loop.run_in_executor(None, load_model)
         self.tokenizer = await loop.run_in_executor(None, load_tokenizer)
-        
+
         logger.info("CTransformers model loaded successfully")
-    
+
     async def unload(self) -> None:
         """卸载模型"""
         self.model = None
         self.tokenizer = None
         import gc
         gc.collect()
-    
+
     async def generate(
-        self, 
-        prompt: str, 
+        self,
+        prompt: str,
         config: GenerationConfig
     ) -> AsyncIterator[StreamResult]:
         """CTransformers 流式生成"""
-        
+
         if not self.model:
             raise RuntimeError("Model not loaded. Call load() first.")
-        
+
         loop = asyncio.get_event_loop()
-        
+
         if config.stream:
             def stream_generate():
                 for token in self.model(
@@ -419,10 +419,10 @@ class CTransformersBackend(ModelBackend):
                     stream=True,
                 ):
                     yield token
-            
+
             async for token in loop.run_in_executor(None, lambda: list(stream_generate())):
                 yield StreamResult(content=token, done=False)
-            
+
             yield StreamResult(content="", done=True)
         else:
             def generate_sync():
@@ -434,7 +434,7 @@ class CTransformersBackend(ModelBackend):
                     top_k=config.top_k,
                     repetition_penalty=config.repeat_penalty,
                 )
-            
+
             content = await loop.run_in_executor(None, generate_sync)
             yield StreamResult(content=content, done=True)
 
@@ -444,7 +444,7 @@ class LLMEngine:
     LightLLM 核心引擎
     统一管理多后端模型加载和推理
     """
-    
+
     def __init__(
         self,
         model_path: str,
@@ -455,42 +455,42 @@ class LLMEngine:
         self.model_path = Path(model_path)
         self.config = config or {}
         self.kwargs = kwargs
-        
+
         if isinstance(backend, str):
             backend = BackendType(backend)
         self.backend_type = backend
-        
+
         self._backend: Optional[ModelBackend] = None
         self._lock = asyncio.Lock()
-    
+
     async def load(self) -> None:
         """加载模型"""
         async with self._lock:
             if self._backend and self._backend.is_loaded:
                 logger.warning("Model already loaded")
                 return
-            
+
             # 创建后端实例
             backend_map = {
                 BackendType.LLAMA_CPP: LlamaCppBackend,
                 BackendType.VLLM: VLLMBackend,
                 BackendType.CTRANSFORMERS: CTransformersBackend,
             }
-            
+
             backend_class = backend_map.get(self.backend_type)
             if not backend_class:
                 raise ValueError(f"Unsupported backend: {self.backend_type}")
-            
+
             self._backend = backend_class(str(self.model_path), **self.kwargs)
             await self._backend.load()
-    
+
     async def unload(self) -> None:
         """卸载模型"""
         async with self._lock:
             if self._backend:
                 await self._backend.unload()
                 self._backend = None
-    
+
     async def generate(
         self,
         prompt: str,
@@ -499,29 +499,29 @@ class LLMEngine:
     ) -> AsyncIterator[StreamResult]:
         """
         生成文本
-        
+
         Args:
             prompt: 用户输入
             system: 系统提示
             config: 生成配置
-        
+
         Yields:
             StreamResult: 流式结果
         """
         if not self._backend or not self._backend.is_loaded:
             raise RuntimeError("Model not loaded. Call load() first.")
-        
+
         if config is None:
             config = GenerationConfig()
-        
+
         # 构建完整 prompt
         full_prompt = prompt
         if system:
             full_prompt = f"[INST] <<SYS>>\n{system}\n<</SYS>>\n\n{prompt} [/INST]"
-        
+
         async for result in self._backend.generate(full_prompt, config):
             yield result
-    
+
     async def complete(
         self,
         prompt: str,
@@ -532,19 +532,19 @@ class LLMEngine:
             config = GenerationConfig(stream=False)
         else:
             config.stream = False
-        
+
         result = ""
         async for chunk in self.generate(prompt, config=config):
             if chunk.content:
                 result += chunk.content
-        
+
         return result
-    
+
     @property
     def is_loaded(self) -> bool:
         """检查模型是否已加载"""
         return self._backend is not None and self._backend.is_loaded
-    
+
     @property
     def backend_name(self) -> str:
         """获取后端名称"""

@@ -49,7 +49,7 @@ class SkillCall:
 class SkillsOptimizer:
     """
     Skills调用优化器
-    
+
     优化策略：
     1. 智能缓存 - 避免重复调用
     2. 参数压缩 - 减少Token使用
@@ -57,7 +57,7 @@ class SkillsOptimizer:
     4. 优先级调度 - 优化执行顺序
     5. 结果复用 - 共享中间结果
     """
-    
+
     def __init__(self):
         self.skills: Dict[str, Skill] = {}
         self.call_history: List[SkillCall] = []
@@ -65,22 +65,22 @@ class SkillsOptimizer:
         self.batch_queue: List[SkillCall] = []
         self.batch_size = 5
         self.batch_timeout = 0.5  # 秒
-        
+
         # 统计
         self.total_calls = 0
         self.cache_hits = 0
         self.token_saved = 0
-    
+
     def register_skill(self, skill: Skill) -> None:
         """注册技能"""
         self.skills[skill.name] = skill
         logger.info(f"Registered skill: {skill.name}")
-    
+
     def unregister_skill(self, name: str) -> None:
         """取消注册技能"""
         if name in self.skills:
             del self.skills[name]
-    
+
     async def call_skill(
         self,
         skill_name: str,
@@ -90,33 +90,33 @@ class SkillsOptimizer:
     ) -> Any:
         """
         调用技能 - 带优化
-        
+
         优化点：
         1. 缓存检查
         2. 参数归一化
         3. 结果缓存
         """
         self.total_calls += 1
-        
+
         # 检查技能是否存在
         if skill_name not in self.skills:
             raise ValueError(f"Skill not found: {skill_name}")
-        
+
         skill = self.skills[skill_name]
-        
+
         # 生成缓存键
         cache_key = self._generate_cache_key(skill_name, parameters)
-        
+
         # 缓存检查
         if skill.cacheable and not force_cache:
             if cache_key in self.cache:
                 self.cache_hits += 1
                 logger.debug(f"Cache hit for {skill_name}")
                 return self.cache[cache_key]
-        
+
         # 参数优化
         optimized_params = self._optimize_parameters(skill, parameters)
-        
+
         # 调用技能
         start_time = time.time()
         try:
@@ -127,16 +127,16 @@ class SkillsOptimizer:
         except Exception as e:
             logger.error(f"Skill call failed: {skill_name}, {e}")
             raise
-        
+
         # 计算Token节省
         original_size = self._estimate_size(parameters)
         optimized_size = self._estimate_size(optimized_params)
         self.token_saved += original_size - optimized_size
-        
+
         # 缓存结果
         if skill.cacheable:
             self.cache[cache_key] = result
-        
+
         # 记录调用
         self.call_history.append(SkillCall(
             skill_name=skill_name,
@@ -144,9 +144,9 @@ class SkillsOptimizer:
             context=context,
             token_cost=optimized_size,
         ))
-        
+
         return result
-    
+
     async def call_skills_batch(
         self,
         calls: List[Dict[str, Any]],
@@ -154,7 +154,7 @@ class SkillsOptimizer:
     ) -> List[Any]:
         """
         批量调用技能
-        
+
         优化策略：
         1. 依赖分析 - 识别可并行的调用
         2. 资源优化 - 复用资源
@@ -163,15 +163,15 @@ class SkillsOptimizer:
         # 分析依赖
         independent = []
         dependent = []
-        
+
         for call in calls:
             if self._is_independent(call):
                 independent.append(call)
             else:
                 dependent.append(call)
-        
+
         results = []
-        
+
         # 并行执行独立调用
         if parallel and independent:
             tasks = [
@@ -179,7 +179,7 @@ class SkillsOptimizer:
                 for c in independent
             ]
             results.extend(await asyncio.gather(*tasks, return_exceptions=True))
-        
+
         # 顺序执行依赖调用
         for call in dependent:
             result = await self.call_skill(
@@ -188,24 +188,24 @@ class SkillsOptimizer:
                 call.get("context")
             )
             results.append(result)
-        
+
         return results
-    
+
     def _optimize_parameters(self, skill: Skill, params: Dict) -> Dict:
         """
         优化参数字符串
-        
+
         策略：
         1. 移除冗余参数
         2. 简化长字符串
         3. 使用引用替代重复内容
         """
         optimized = {}
-        
+
         for key, value in params.items():
             if value is None:
                 continue
-            
+
             if isinstance(value, str) and len(value) > 1000:
                 # 长字符串使用哈希引用
                 optimized[f"_ref_{key}"] = self._hash_string(value)
@@ -221,31 +221,31 @@ class SkillsOptimizer:
                 ]
             else:
                 optimized[key] = value
-        
+
         return optimized
-    
+
     def _compress_string(self, text: str) -> str:
         """压缩字符串"""
         if len(text) < 100:
             return text
-        
+
         # 简单压缩：移除多余空白
         compressed = re.sub(r'\s+', ' ', text)
         compressed = compressed.strip()
-        
+
         # 如果仍然很长，截断并添加标记
         if len(compressed) > 500:
             return compressed[:250] + "...[truncated]"
-        
+
         return compressed
-    
+
     def _generate_cache_key(self, skill_name: str, params: Dict) -> str:
         """生成缓存键"""
         # 归一化参数
         normalized = self._normalize_params(params)
         key_str = f"{skill_name}:{normalized}"
         return hashlib.md5(key_str.encode()).hexdigest()
-    
+
     def _normalize_params(self, params: Dict) -> str:
         """归一化参数"""
         items = []
@@ -256,20 +256,20 @@ class SkillsOptimizer:
                 v = v[:100] if len(v) > 100 else v
             items.append(f"{k}={v}")
         return "|".join(items)
-    
+
     def _hash_string(self, text: str) -> str:
         """哈希长字符串"""
         return hashlib.md5(text.encode()).hexdigest()[:16]
-    
+
     def _estimate_size(self, obj: Any) -> int:
         """估计Token大小"""
         import sys
         return len(str(obj)) // 4  # 粗略估计
-    
+
     def _is_independent(self, call: Dict) -> bool:
         """判断是否独立调用"""
         return True  # 简化实现
-    
+
     async def _default_handler(
         self,
         skill: Skill,
@@ -278,7 +278,7 @@ class SkillsOptimizer:
     ) -> Any:
         """默认处理器"""
         return {"status": "ok", "skill": skill.name}
-    
+
     def get_stats(self) -> Dict:
         """获取统计信息"""
         return {
@@ -289,7 +289,7 @@ class SkillsOptimizer:
             "cache_size": len(self.cache),
             "registered_skills": len(self.skills),
         }
-    
+
     def clear_cache(self):
         """清空缓存"""
         self.cache.clear()
@@ -301,11 +301,11 @@ class SkillsRegistry:
     Skills注册表
     管理GitHub等来源的Skills
     """
-    
+
     def __init__(self, optimizer: SkillsOptimizer):
         self.optimizer = optimizer
         self.github_skills: Dict[str, Dict] = {}
-    
+
     def register_github_skill(
         self,
         name: str,
@@ -320,15 +320,15 @@ class SkillsRegistry:
             description=description,
             cacheable=True,
         )
-        
+
         self.github_skills[name] = {
             "repo": repo,
             "type": skill_type,
         }
-        
+
         self.optimizer.register_skill(skill)
         return skill
-    
+
     def load_skill_from_github(self, repo: str, path: str) -> Optional[Dict]:
         """从GitHub加载Skill"""
         # 实现GitHub API调用
@@ -340,18 +340,18 @@ class TokenBudget:
     Token预算管理
     确保Token使用在限制内
     """
-    
+
     def __init__(self, max_tokens: int = 128000):
         self.max_tokens = max_tokens
         self.used_tokens = 0
         self.budget_history: List[Dict] = []
-    
+
     def allocate(self, tokens: int, purpose: str) -> bool:
         """分配Token"""
         if self.used_tokens + tokens > self.max_tokens:
             logger.warning(f"Token budget exceeded: {purpose}")
             return False
-        
+
         self.used_tokens += tokens
         self.budget_history.append({
             "purpose": purpose,
@@ -359,20 +359,20 @@ class TokenBudget:
             "timestamp": time.time(),
         })
         return True
-    
+
     def release(self, tokens: int):
         """释放Token"""
         self.used_tokens = max(0, self.used_tokens - tokens)
-    
+
     def reset(self):
         """重置预算"""
         self.used_tokens = 0
         self.budget_history.clear()
-    
+
     def get_remaining(self) -> int:
         """获取剩余Token"""
         return self.max_tokens - self.used_tokens
-    
+
     def get_usage(self) -> Dict:
         """获取使用情况"""
         return {
