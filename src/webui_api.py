@@ -11,19 +11,20 @@ import sys
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
-import json
 import threading
-import subprocess
-from pathlib import Path
 from datetime import datetime
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 # 导入模型管理模块
 from src.model_manager import (
-    ModelDownloader, list_popular_models, get_model_info,
-    ModelCatalog, get_system_info, DEFAULT_MODEL_DIR
+    DEFAULT_MODEL_DIR,
+    ModelCatalog,
+    ModelDownloader,
+    get_model_info,
+    get_system_info,
+    list_popular_models,
 )
 
 # ============================================
@@ -362,18 +363,21 @@ def health():
 
 def main():
     port = 7860
-    print("""
+    print(f"""
 ╔══════════════════════════════════════════════════════════╗
 ║                                                          ║
 ║   LightLLM WebUI 已启动                                  ║
 ║                                                          ║
-║   访问地址: http://localhost:{0}                          ║
+║   访问地址: http://localhost:{port}                          ║
 ║                                                          ║
 ║   按 Ctrl+C 停止服务                                     ║
 ║                                                          ║
 ╚══════════════════════════════════════════════════════════╝
-    """.format(port))
+    """)
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
 
 if __name__ == '__main__':
     main()
+
+
+

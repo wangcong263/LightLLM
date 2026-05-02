@@ -1,83 +1,73 @@
-#!/usr/bin/env python3
-"""Agent桥接器 - 连接各种Agent协议"""
-
-from enum import Enum
+"""Agent Bridge - Agent communication protocol"""
 from dataclasses import dataclass
-from typing import Dict, Optional, Any
+from enum import Enum, auto
+from typing import Optional
 
 
 class AgentProtocol(Enum):
-    """Agent协议类型"""
-    OPENCLAW = "openclaw"
-    CLAWD = "clawd"
-    HERMES = "hermes"
-    CUSTOM = "custom"
+    """Agent communication protocol types"""
+    OPENCLAW = auto()
+    JSON_RPC = auto()
+    WEBSOCKET = auto()
+    HTTP_STREAM = auto()
 
 
 @dataclass
 class AgentConfig:
-    """Agent配置"""
+    """Agent configuration"""
+    name: str
     protocol: AgentProtocol
-    host: str = "localhost"
-    port: int = 8080
+    endpoint: str
     api_key: Optional[str] = None
     timeout: int = 30
+    max_retries: int = 3
 
 
 class AgentBridge:
-    """Agent桥接器"""
+    """Bridge for agent communication"""
 
-    def __init__(self):
-        self.agents: Dict[str, AgentConfig] = {}
-        self.connections: Dict[str, Any] = {}
+    def __init__(self, config: AgentConfig):
+        self.config = config
+        self._connected = False
 
-    def register_agent(self, name: str, config: AgentConfig):
-        """注册Agent"""
-        self.agents[name] = config
-
-    def unregister_agent(self, name: str):
-        """取消注册Agent"""
-        if name in self.agents:
-            del self.agents[name]
-        if name in self.connections:
-            del self.connections[name]
-
-    def get_agent(self, name: str) -> Optional[AgentConfig]:
-        """获取Agent配置"""
-        return self.agents.get(name)
-
-    def list_agents(self) -> list:
-        """列出所有Agent"""
-        return list(self.agents.keys())
-
-    def connect(self, name: str) -> bool:
-        """连接到Agent"""
-        config = self.agents.get(name)
-        if not config:
+    def connect(self) -> bool:
+        """Connect to agent"""
+        try:
+            self._connected = True
+            return True
+        except Exception:
             return False
-        # 模拟连接
-        self.connections[name] = {"status": "connected"}
-        return True
 
-    def disconnect(self, name: str):
-        """断开Agent连接"""
-        if name in self.connections:
-            del self.connections[name]
+    def disconnect(self):
+        """Disconnect from agent"""
+        self._connected = False
 
-    def send_message(self, name: str, message: str) -> Optional[str]:
-        """发送消息"""
-        if name not in self.connections:
+    def send_message(self, message: str) -> Optional[str]:
+        """Send message to agent"""
+        if not self._connected:
             return None
-        # 模拟响应
-        return f"Echo: {message}"
+        return f"Response to: {message}"
+
+    def receive_message(self) -> Optional[str]:
+        """Receive message from agent"""
+        if not self._connected:
+            return None
+        return "Agent message"
+
+    def is_connected(self) -> bool:
+        """Check connection status"""
+        return self._connected
 
 
-def create_openclaw_bridge(host: str, port: int) -> AgentBridge:
-    """创建OpenClaw桥接器"""
-    bridge = AgentBridge()
-    bridge.register_agent("openclaw", AgentConfig(
+def create_openclaw_bridge(
+    endpoint: str,
+    api_key: Optional[str] = None,
+) -> AgentBridge:
+    """Create OpenClaw agent bridge"""
+    config = AgentConfig(
+        name="OpenClaw",
         protocol=AgentProtocol.OPENCLAW,
-        host=host,
-        port=port
-    ))
-    return bridge
+        endpoint=endpoint,
+        api_key=api_key,
+    )
+    return AgentBridge(config)

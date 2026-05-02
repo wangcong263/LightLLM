@@ -4,16 +4,14 @@ LightLLM 模型转换器
 支持多种模型格式之间的转换
 """
 
-import os
-import sys
-import json
+import argparse
 import shutil
 import subprocess
-from pathlib import Path
+import sys
 from dataclasses import dataclass
-from typing import Optional, List, Dict
 from enum import Enum
-import argparse
+from pathlib import Path
+from typing import dict, list
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -39,7 +37,7 @@ class ConversionJob:
     output_path: Path
     input_format: ModelFormat
     output_format: ModelFormat
-    quantization: Optional[str] = None  # 量化参数如 Q4_K_M
+    quantization: str] = None  # 量化参数如 Q4_K_M
     extra_args: Dict = None
 
     def __post_init__(self):
@@ -67,7 +65,7 @@ class ModelConverter:
 
     def convert_safetensors_to_gguf(self, job: ConversionJob, callback=None) -> Path:
         """Safetensors -> GGUF"""
-        print(f"转换 Safetensors 到 GGUF...")
+        print("转换 Safetensors 到 GGUF...")
         print(f"输入: {job.input_path}")
         print(f"输出: {job.output_path}")
 
@@ -100,7 +98,7 @@ class ModelConverter:
 
     def quantize_gguf(self, job: ConversionJob, callback=None) -> Path:
         """GGUF 量化"""
-        print(f"量化 GGUF 模型...")
+        print("量化 GGUF 模型...")
         print(f"输入: {job.input_path}")
         print(f"输出: {job.output_path}")
         print(f"量化等级: {job.quantization}")
@@ -127,7 +125,7 @@ class ModelConverter:
 
     def convert_to_onnx(self, job: ConversionJob, callback=None) -> Path:
         """转换为 ONNX 格式"""
-        print(f"转换到 ONNX 格式...")
+        print("转换到 ONNX 格式...")
 
         try:
             import torch
@@ -141,7 +139,7 @@ class ModelConverter:
         tokenizer = AutoTokenizer.from_pretrained(str(job.input_path))
 
         # 导出为 ONNX
-        print(f"导出 ONNX...")
+        print("导出 ONNX...")
         dummy_input = tokenizer("Hello", return_tensors="pt")
 
         torch.onnx.export(
@@ -162,7 +160,7 @@ class ModelConverter:
 
     def convert_to_mlx(self, job: ConversionJob, callback=None) -> Path:
         """转换为 MLX 格式 (Apple Silicon)"""
-        print(f"转换到 MLX 格式...")
+        print("转换到 MLX 格式...")
 
         try:
             from mlx_lm import convert
@@ -182,7 +180,7 @@ class ModelConverter:
 
         return job.output_path
 
-    def _get_llama_cpp_convert_script(self) -> Optional[Path]:
+    def _get_llama_cpp_convert_script(self) -> Path]:
         """获取 llama.cpp 转换脚本"""
         possible_paths = [
             # llama.cpp 本地安装
@@ -207,7 +205,7 @@ class ModelConverter:
 
         return None
 
-    def _get_quantize_binary(self) -> Optional[Path]:
+    def _get_quantize_binary(self) -> Path]:
         """获取 llama.cpp 量化工具"""
         possible_paths = [
             Path.home() / ".local" / "bin" / "llama-quantize",
@@ -270,7 +268,7 @@ def convert_model(input_path: str, output_format: str, output_path: str = None,
     output_fmt = ModelFormat(output_format)
 
     if verbose:
-        print(f"\n🔄 转换模型")
+        print("\n🔄 转换模型")
         print(f"   输入: {input_p}")
         print(f"   格式: {input_format.value} -> {output_fmt.value}")
         if quantization:
@@ -336,7 +334,7 @@ def quantize_model(input_path: str, output_path: str, level: str = "Q4_K_M"):
     if not input_p.exists():
         raise FileNotFoundError(f"输入文件不存在: {input_path}")
 
-    print(f"\n⚡ 量化模型")
+    print("\n⚡ 量化模型")
     print(f"   输入: {input_p}")
     print(f"   输出: {output_path}")
     print(f"   量化: {level}")
@@ -443,7 +441,7 @@ def install_llama_cpp():
 
 # ============= CLI =============
 def main():
-    parser = argparse.ArgumentParser(description="LightLLM 模型转换工具")
+    parser = argparse.ArgumentParser(description="lightllm 模型转换工具")
     parser.add_argument("action", choices=["convert", "quantize", "formats", "levels", "install-llama"],
                         help="操作: convert(转换) / quantize(量化) / formats(格式) / levels(量化等级) / install-llama(安装llama.cpp)")
     parser.add_argument("--input", "-i", help="输入文件/目录")
@@ -505,3 +503,6 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+

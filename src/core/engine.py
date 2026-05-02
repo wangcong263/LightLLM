@@ -4,10 +4,11 @@ LightLLM 核心LLM运行引擎
 支持 llama.cpp / vLLM / CTranslate2 多后端
 """
 import asyncio
-import os
 import logging
-from typing import Optional, List, Dict, Any, AsyncIterator, Union
-from dataclasses import dataclass, field
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from typing import Any, dict, Union
+
 
 @dataclass
 class ModelConfig:
@@ -45,8 +46,8 @@ class ModelManager:
     def get_model(self, name: str):
         return self.models.get(name)
 
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +86,8 @@ class StreamResult:
     """流式生成结果"""
     content: str
     done: bool
-    token_id: Optional[int] = None
-    usage: Optional[Dict[str, int]] = None
+    token_id: int] = None
+    usage: Dict[str, int]] = None
 
 
 class ModelBackend:
@@ -132,8 +133,7 @@ class LlamaCppBackend(ModelBackend):
     async def load(self) -> None:
         """加载 llama.cpp 模型"""
         try:
-            from llama_cpp import Llama
-            from llama_cpp import LlamaTokenizer
+            from llama_cpp import Llama, LlamaTokenizer
         except ImportError as err:
             raise ImportError("llama-cpp-python 未安装。请运行: pip install llama-cpp-python") from err
 
@@ -480,7 +480,7 @@ class LLMEngine:
         self,
         model_path: str,
         backend: Union[BackendType, str] = BackendType.LLAMA_CPP,
-        config: Optional[Dict[str, Any]] = None,
+        config: Dict[str, Any]] = None,
         **kwargs
     ):
         self.model_path = Path(model_path)
@@ -491,7 +491,7 @@ class LLMEngine:
             backend = BackendType(backend)
         self.backend_type = backend
 
-        self._backend: Optional[ModelBackend] = None
+        self._backend: ModelBackend] = None
         self._lock = asyncio.Lock()
 
     async def load(self) -> None:
@@ -525,8 +525,8 @@ class LLMEngine:
     async def generate(
         self,
         prompt: str,
-        system: Optional[str] = None,
-        config: Optional[GenerationConfig] = None,
+        system: str] = None,
+        config: GenerationConfig] = None,
     ) -> AsyncIterator[StreamResult]:
         """
         生成文本
@@ -556,7 +556,7 @@ class LLMEngine:
     async def complete(
         self,
         prompt: str,
-        config: Optional[GenerationConfig] = None,
+        config: GenerationConfig] = None,
     ) -> str:
         """一次性生成（非流式）"""
         if config is None:
@@ -592,3 +592,6 @@ async def create_engine(
     engine = LLMEngine(model_path, backend=backend, **kwargs)
     await engine.load()
     return engine
+
+
+

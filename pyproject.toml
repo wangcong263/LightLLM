@@ -1,74 +1,12 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "lightllm"
-version = "1.0.0"
-description = "轻量化本地LLM运行工具 - 更轻、更快、更智能"
-readme = "README.md"
-requires-python = ">=3.9"
-license = {text = "MIT"}
-authors = [
-    {name = "LightLLM Team"}
-]
-keywords = ["llm", "local-llm", "inference", "ollama-alternative", "ai"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
-
-dependencies = [
-    "fastapi>=0.104.0",
-    "uvicorn>=0.24.0",
-    "pydantic>=2.0.0",
-    "httpx>=0.25.0",
-    "structlog>=23.0.0",
-]
-
-[project.optional-dependencies]
-llama-cpp = ["llama-cpp-python>=0.2.0"]
-vllm = ["vllm>=0.2.0"]
-ctranslate = ["ctransformers>=0.2.0"]
-dev = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-]
-all = [
-    "lightllm[llama-cpp,vllm,ctranslate,dev]",
-]
-
-[project.scripts]
-lightllm = "lightllm.src.cli:main"
-
-[project.urls]
-Homepage = "https://github.com/lightllm/lightllm"
-Documentation = "https://lightllm.readthedocs.io"
-Repository = "https://github.com/lightllm/lightllm"
-Issues = "https://github.com/lightllm/lightllm/issues"
-
-[tool.setuptools]
-packages = ["src", "src.core", "src.api"]
-
-[tool.black]
-line-length = 100
-target-version = ["py39", "py310", "py311"]
-
 [tool.ruff]
 line-length = 100
 target-version = "py39"
 
 [tool.ruff.lint]
+# N999: Invalid module name (允许 docstring 中的大小写)
+# E501: Line too long (已忽略)
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
-ignore = ["E501"]
+ignore = ["E501", "N999"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

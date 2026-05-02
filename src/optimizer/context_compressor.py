@@ -2,7 +2,7 @@
 """上下文压缩器 - 智能压缩对话上下文"""
 
 from dataclasses import dataclass
-from typing import List, Dict, Optional
+from typing import dict, list
 
 
 @dataclass
@@ -16,7 +16,7 @@ class CompressionConfig:
 class ContextCompressor:
     """上下文压缩器"""
 
-    def __init__(self, config: Optional[CompressionConfig] = None):
+    def __init__(self, config: CompressionConfig] = None):
         self.config = config or CompressionConfig()
 
     def compress(self, messages: List[Dict]) -> List[Dict]:
@@ -59,3 +59,6 @@ class ContextCompressor:
             "preserve_system": self.config.preserve_system,
             "preserve_last_n": self.config.preserve_last_n,
         }
+
+
+

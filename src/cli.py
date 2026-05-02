@@ -3,18 +3,18 @@
 LightLLM 命令行界面
 交互式聊天或单次生成
 """
-import asyncio
 import argparse
-import sys
+import asyncio
 import os
+import sys
 from pathlib import Path
-from typing import Optional
+from typing import
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.core.engine import LLMEngine, BackendType, GenerationConfig
 from config import MODEL_CACHE_DIR, PRESET_MODELS, create_backend_config, get_model_path
+from src.core.engine import BackendType, GenerationConfig, LLMEngine
 
 
 class CLI:
@@ -24,11 +24,11 @@ class CLI:
         self.model = model
         self.backend = BackendType(backend)
         self.stream = stream
-        self.engine: Optional[LLMEngine] = None
+        self.engine: LLMEngine] = None
 
     async def init(self):
         """初始化"""
-        print(f"🚀 LightLLM CLI")
+        print("🚀 LightLLM CLI")
         print(f"   Model: {self.model}")
         print(f"   Backend: {self.backend.value}")
         print()
@@ -42,16 +42,16 @@ class CLI:
                 model_path = self.model
             else:
                 print(f"❌ Model '{self.model}' not found!")
-                print(f"\n📥 Available models:")
+                print("\n📥 Available models:")
                 for name, info in PRESET_MODELS.items():
                     status = "✓" if get_model_path(name) else "○"
                     print(f"   {status} {name}: {info['name']} ({info['size_mb']}MB)")
-                print(f"\n💡 Download with:")
+                print("\n💡 Download with:")
                 print(f"   python -m src.cli --download {self.model}")
                 return False
 
         print(f"📂 Model: {model_path}")
-        print(f"⏳ Loading model...")
+        print("⏳ Loading model...")
 
         # 创建引擎
         config = create_backend_config(self.backend)
@@ -61,13 +61,13 @@ class CLI:
         success = await self.engine.load()
 
         if success:
-            print(f"✅ Model loaded!")
+            print("✅ Model loaded!")
             return True
         else:
             print("❌ Failed to load model!")
             return False
 
-    async def chat(self, system: Optional[str] = None):
+    async def chat(self, system: str] = None):
         """交互式聊天"""
         print("\n" + "=" * 50)
         print("💬 Chat Mode (Ctrl+C to exit)")
@@ -122,7 +122,7 @@ class CLI:
                 return 1
 
         print(f"📝 Prompt: {prompt[:100]}...")
-        print(f"⏳ Generating...")
+        print("⏳ Generating...")
 
         config = GenerationConfig(max_tokens=max_tokens)
         result_text = ""
@@ -139,7 +139,7 @@ class CLI:
         """下载模型"""
         if model_name not in PRESET_MODELS:
             print(f"❌ Unknown model: {model_name}")
-            print(f"\n📥 Available:")
+            print("\n📥 Available:")
             for name in PRESET_MODELS:
                 print(f"   - {name}")
             return 1
@@ -191,7 +191,7 @@ class CLI:
 
 async def async_main():
     parser = argparse.ArgumentParser(
-        description="LightLLM - 轻量化本地 LLM 推理",
+        description="lightllm - 轻量化本地 LLM 推理",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -269,3 +269,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+

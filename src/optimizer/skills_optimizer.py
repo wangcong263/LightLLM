@@ -2,13 +2,13 @@
 Skills调用优化器
 减少Token使用，提高调用效率
 """
-import re
 import hashlib
+import logging
+import re
 import time
-from typing import List, Dict, Any, Optional, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-import logging
+from typing import Any, Callable, dict, list
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class Skill:
     type: SkillType
     description: str
     parameters: Dict[str, Any] = field(default_factory=dict)
-    handler: Optional[Callable] = None
+    handler: Callable] = None
     cacheable: bool = True
     priority: int = 0
 
@@ -41,7 +41,7 @@ class SkillCall:
     """技能调用"""
     skill_name: str
     parameters: Dict[str, Any]
-    context: Optional[Dict] = None
+    context: Dict] = None
     timestamp: float = field(default_factory=time.time)
     token_cost: int = 0
 
@@ -85,7 +85,7 @@ class SkillsOptimizer:
         self,
         skill_name: str,
         parameters: Dict[str, Any],
-        context: Optional[Dict] = None,
+        context: Dict] = None,
         force_cache: bool = False,
     ) -> Any:
         """
@@ -263,7 +263,6 @@ class SkillsOptimizer:
 
     def _estimate_size(self, obj: Any) -> int:
         """估计Token大小"""
-        import sys
         return len(str(obj)) // 4  # 粗略估计
 
     def _is_independent(self, call: Dict) -> bool:
@@ -274,7 +273,7 @@ class SkillsOptimizer:
         self,
         skill: Skill,
         params: Dict,
-        context: Optional[Dict]
+        context: Dict]
     ) -> Any:
         """默认处理器"""
         return {"status": "ok", "skill": skill.name}
@@ -329,7 +328,7 @@ class SkillsRegistry:
         self.optimizer.register_skill(skill)
         return skill
 
-    def load_skill_from_github(self, repo: str, path: str) -> Optional[Dict]:
+    def load_skill_from_github(self, repo: str, path: str) -> Dict]:
         """从GitHub加载Skill"""
         # 实现GitHub API调用
         return None  # 简化实现
@@ -409,3 +408,6 @@ class GitHubSkillsOptimizer:
     def clear_cache(self):
         """清空缓存"""
         self.cache.clear()
+
+
+

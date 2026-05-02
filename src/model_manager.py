@@ -4,17 +4,15 @@ LightLLM 模型管理器 v2.0
 支持多种来源下载和管理本地大模型
 """
 
+import argparse
 import os
-import sys
-import json
 import shutil
 import subprocess
-import requests
-from pathlib import Path
-from dataclasses import dataclass, asdict, field
-from typing import Optional, List, Dict, Callable
+import sys
+from dataclasses import asdict, dataclass, field
 from enum import Enum
-import argparse
+from pathlib import Path
+from typing import Callable, dict, list
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -380,7 +378,7 @@ class ModelDownloader:
     def __init__(self, model_dir: Path = None):
         self.model_dir = model_dir or DEFAULT_MODEL_DIR
         self.model_dir.mkdir(parents=True, exist_ok=True)
-        self.progress_callback: Optional[Callable] = None
+        self.progress_callback: Callable] = None
 
     def set_progress_callback(self, callback: Callable):
         """设置进度回调"""
@@ -558,7 +556,7 @@ def list_popular_models() -> List[Dict]:
     ]
 
 
-def get_model_info(model_id: str) -> Optional[Dict]:
+def get_model_info(model_id: str) -> Dict]:
     """获取模型信息"""
     model = ModelCatalog.get_all_models().get(model_id)
     if model:
@@ -608,7 +606,7 @@ def get_recommended_models(sys_info: Dict) -> List[Dict]:
 
 # ============= CLI =============
 def main():
-    parser = argparse.ArgumentParser(description="LightLLM 模型管理工具")
+    parser = argparse.ArgumentParser(description="lightllm 模型管理工具")
     parser.add_argument("action", choices=["list", "install", "remove", "info", "search", "installed", "recommend"],
                         help="操作: list(列表) / install(安装) / remove(删除) / info(详情) / search(搜索) / installed(已安装) / recommend(推荐)")
     parser.add_argument("--model", "-m", help="模型ID")
@@ -741,7 +739,7 @@ def main():
 
     elif args.action == "recommend":
         sys_info = get_system_info()
-        print(f"\n💻 系统配置:")
+        print("\n💻 系统配置:")
         print(f"   内存: {sys_info['memory_available_gb']:.1f} GB / {sys_info['memory_total_gb']:.1f} GB")
         print(f"   CPU: {sys_info['cpu_count']} 核心\n")
 
@@ -758,3 +756,6 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+
