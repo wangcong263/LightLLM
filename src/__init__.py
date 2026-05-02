@@ -6,7 +6,7 @@ lightllm - 轻量化本地LLM运行工具
 __version__ = "1.0.0"
 __author__ = "lightllm Team"
 
-from .model_converter import ModelConverter, list_supported_formats
+from .model_converter import ModelConverter
 from .model_manager import (
     DEFAULT_MODEL_DIR,
     ModelCatalog,
@@ -24,7 +24,7 @@ __all__ = [
     "get_system_info",
     "DEFAULT_MODEL_DIR",
     "ModelConverter",
-    "list_supported_formats",
+    "ModelConverter",
 ]
 
 

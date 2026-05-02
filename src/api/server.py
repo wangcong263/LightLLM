@@ -1,187 +1,155 @@
-"""lightllm API Server - OpenAI 兼容 API"""
+#!/usr/bin/env python3
+"""LightLLM WebUI API Server - REST API for model management and deployment"""
+import logging
+import os
 import sys
-from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
-# 添加项目根目录到 Python 路径
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+# Add project root to Python path
+PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-from sse_starlette.sse import EventSourceResponse
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
-# 尝试导入核心模块
-try:
-    from src.core.engine import BackendType, LLMEngine
-    from src.model_manager import ModelDownloader, get_system_info
-except ImportError as e:
-    print(f"Warning: {e}")
-    BackendType = None
-    LLMEngine = None
-    ModelDownloader = None
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Lazy imports
+LLMEngine = None
+ModelManager = None
+ModelConverter = None
 
 
-app = Flask(__name__)
-CORS(app)
-
-# 全局引擎实例
-llm_engine = None
-model_manager = ModelDownloader() if ModelDownloader else None
-
-
-class ChatRole(Enum):
-    SYSTEM = "system"
-    USER = "user"
-    ASSISTANT = "assistant"
+def get_engine():
+    global LLMEngine
+    if LLMEngine is None:
+        from src.core.engine import LLMEngine
+    return LLMEngine
 
 
-@dataclass
-class ChatMessage:
-    role: str
-    content: str
+def get_manager():
+    global ModelManager
+    if ModelManager is None:
+        from src.core.engine import ModelManager
+    return ModelManager
 
 
-@dataclass
-class ChatCompletionRequest:
-    model: str
-    messages: List[Dict[str, str]]
-    temperature: float = 0.7
-    top_p: float = 0.9
-    max_tokens: int = 2048
-    stream: bool = False
-    stop: Optional[List[str]] = None
+def get_converter():
+    global ModelConverter
+    if ModelConverter is None:
+        from src.model_converter import ModelConverter
+    return ModelConverter
 
 
-@app.route("/health", methods=["GET"])
-def health():
-    """健康检查"""
-    return jsonify({
-        "status": "ok",
-        "timestamp": datetime.now().isoformat(),
-    })
+app = FastAPI(title="LightLLM API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
-@app.route("/v1/models", methods=["GET"])
-def list_models():
-    """列出可用模型"""
-    if model_manager is None:
-        return jsonify({"error": "Model manager not available"}), 500
-
-    installed = model_manager.list_installed()
-    return jsonify({
-        "object": "list",
-        "data": [
-            {
-                "id": m["id"],
-                "object": "model",
-                "created": m.get("installed_at", 0),
-                "owned_by": "local",
-            }
-            for m in installed
-        ]
-    })
+class ModelStatus(str, Enum):
+    """Model status"""
+    READY = "ready"
+    LOADING = "loading"
+    ERROR = "error"
+    UNLOADED = "unloaded"
 
 
-@app.route("/v1/chat/completions", methods=["POST"])
-def chat_completions():
-    """Chat Completion API - OpenAI 兼容"""
-    try:
-        data = request.json
-        req = ChatCompletionRequest(
-            model=data.get("model", "default"),
-            messages=data.get("messages", []),
-            temperature=data.get("temperature", 0.7),
-            top_p=data.get("top_p", 0.9),
-            max_tokens=data.get("max_tokens", 2048),
-            stream=data.get("stream", False),
-            stop=data.get("stop"),
-        )
-
-        if req.stream:
-            return EventSourceResponse(
-                generate_stream_response(req),
-                media_type="text/event-stream"
-            )
-
-        return jsonify(generate_response(req))
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.get("/")
+async def root():
+    return {"message": "LightLLM API Server", "version": "1.0.0"}
 
 
-def generate_response(req: ChatCompletionRequest) -> Dict[str, Any]:
-    """生成完整响应"""
-    content = f"Echo: {req.messages[-1]['content'] if req.messages else ''}"
-
-    return {
-        "id": f"chatcmpl-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-        "object": "chat.completion",
-        "created": int(datetime.now().timestamp()),
-        "model": req.model,
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": content,
-                },
-                "finish_reason": "stop",
-            }
-        ],
-        "usage": {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "total_tokens": 0,
-        },
-    }
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
 
 
-async def generate_stream_response(req: ChatCompletionRequest):
-    """生成流式响应"""
-    content = f"Echo: {req.messages[-1]['content'] if req.messages else ''}"
-
-    for i, char in enumerate(content):
-        chunk = {
-            "id": f"chatcmpl-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            "object": "chat.completion.chunk",
-            "created": int(datetime.now().timestamp()),
-            "model": req.model,
-            "choices": [
-                {
-                    "index": 0,
-                    "delta": {"content": char},
-                    "finish_reason": None,
-                }
-            ],
-        }
-        yield {"event": "message", "data": chunk}
-
-    # 发送最后一个 chunk
-    final_chunk = {
-        "id": f"chatcmpl-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-        "object": "chat.completion.chunk",
-        "created": int(datetime.now().timestamp()),
-        "model": req.model,
-        "choices": [
-            {
-                "index": 0,
-                "delta": {},
-                "finish_reason": "stop",
-            }
-        ],
-    }
-    yield {"event": "message", "data": final_chunk}
+@app.get("/api/models")
+async def list_models():
+    """List available models"""
+    manager_cls = get_manager()
+    manager = manager_cls()
+    return {"models": manager.list_models()}
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8000, debug: bool = False):
-    """运行 API 服务器"""
-    print(f"lightllm API Server starting on {host}:{port}")
-    app.run(host=host, port=port, debug=debug)
+@app.get("/api/models/{name}")
+async def get_model(name: str):
+    """Get model info"""
+    manager_cls = get_manager()
+    manager = manager_cls()
+    config = manager.get(name)
+    if not config:
+        raise HTTPException(status_code=404, detail="Model not found")
+    return {"config": config}
+
+
+@app.post("/api/models")
+async def register_model(config: dict[str, Any]):
+    """Register a model"""
+    manager_cls = get_manager()
+    from src.core.engine import BackendType, ModelConfig
+    backend = BackendType(config.get("backend", "llama.cpp"))
+    model_config = ModelConfig(
+        name=config["name"],
+        path=config["path"],
+        backend=backend,
+        n_ctx=config.get("n_ctx", 2048),
+    )
+    manager = manager_cls()
+    manager.register(model_config)
+    return {"status": "registered", "name": config["name"]}
+
+
+@app.delete("/api/models/{name}")
+async def unregister_model(name: str):
+    """Unregister a model"""
+    manager_cls = get_manager()
+    manager = manager_cls()
+    if manager.unregister(name):
+        return {"status": "unregistered", "name": name}
+    raise HTTPException(status_code=404, detail="Model not found")
+
+
+@app.get("/api/formats")
+async def list_formats():
+    """List supported model formats"""
+    converter_cls = get_converter()
+    return {"formats": converter_cls.list_supported_formats()}
+
+
+@app.post("/api/convert")
+async def convert_model(source: str, target_format: str, output: str):
+    """Convert model format"""
+    converter_cls = get_converter()
+    converter = converter_cls()
+    result = converter.convert(source, target_format, output)
+    return {"status": "converted", "result": result}
+
+
+@app.get("/api/system")
+async def system_info():
+    """Get system info"""
+    converter_cls = get_converter()
+    return {"info": converter_cls.get_system_info()}
+
+
+def main():
+    """Run API server"""
+    host = os.getenv("LIGHTLLM_HOST", "0.0.0.0")
+    port = int(os.getenv("LIGHTLLM_PORT", "8000"))
+    logger.info(f"Starting LightLLM API server on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
-    run_server()
+    main()

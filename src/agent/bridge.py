@@ -1,15 +1,15 @@
 """Agent Bridge - Agent communication protocol"""
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, Dict, Any
+from typing import Any, Optional
 
 
 class AgentProtocol(Enum):
     """Agent communication protocol types"""
     OPENCLAW = auto()
-    LangChain = auto()
-    AutoGen = auto()
-    Custom = auto()
+    NATIVE = auto()
+    REST = auto()
+    WEBSOCKET = auto()
 
 
 @dataclass
@@ -19,46 +19,45 @@ class AgentConfig:
     protocol: AgentProtocol = AgentProtocol.OPENCLAW
     endpoint: Optional[str] = None
     timeout: int = 30
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[dict[str, str]] = None
 
 
 class AgentBridge:
-    """Agent bridge for multi-agent communication"""
+    """Agent communication bridge"""
 
-    def __init__(self, config: AgentConfig):
+    def __init__(self, config: Optional[AgentConfig] = None):
         self.config = config
+        self.protocol = config.protocol if config else AgentProtocol.OPENCLAW
         self.connected = False
 
     def connect(self) -> bool:
         """Connect to agent"""
-        if self.config.endpoint:
-            # Simulate connection
-            self.connected = True
-            return True
-        return False
+        self.connected = True
+        return True
 
-    def disconnect(self) -> None:
+    def disconnect(self):
         """Disconnect from agent"""
         self.connected = False
 
-    def send_message(self, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def send_message(self, message: str) -> dict[str, Any]:
         """Send message to agent"""
-        if not self.connected:
-            return None
         return {"status": "sent", "message": message}
 
-    def receive_message(self) -> Optional[Dict[str, Any]]:
+    def receive_message(self) -> Optional[dict[str, Any]]:
         """Receive message from agent"""
-        if not self.connected:
-            return None
         return None
 
 
-def create_openclaw_bridge(name: str, endpoint: Optional[str] = None) -> AgentBridge:
-    """Create OpenCLAW protocol agent bridge"""
+def create_openclaw_bridge(
+    name: str,
+    endpoint: str,
+    timeout: int = 30
+) -> AgentBridge:
+    """Create OpenClaw protocol bridge"""
     config = AgentConfig(
         name=name,
         protocol=AgentProtocol.OPENCLAW,
         endpoint=endpoint,
+        timeout=timeout
     )
-    return AgentBridge(config)
+    return AgentBridge(config=config)

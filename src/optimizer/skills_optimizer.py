@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """Skills Optimizer - Optimizes agent skills and function calling"""
-import json
 import logging
-import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Dict, Any, List, Callable
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class SkillType(Enum):
-    """技能类型"""
+    """Skill types"""
     TOOL = "tool"
     ACTION = "action"
     CONTEXT = "context"
@@ -20,229 +18,164 @@ class SkillType(Enum):
 
 @dataclass
 class Skill:
-    """技能定义"""
+    """Skill definition"""
     name: str
     type: SkillType
     description: str
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = None
     handler: Optional[Callable[..., Any]] = None
     enabled: bool = True
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class SkillCall:
-    """技能调用"""
+    """Skill call record"""
     skill_name: str
-    parameters: Dict[str, Any]
-    result: Optional[Any] = None
+    input_data: dict[str, Any]
+    output_data: Optional[dict[str, Any]] = None
     success: bool = False
+    error: Optional[str] = None
 
 
 class SkillsOptimizer:
-    """技能优化器"""
+    """Optimizes agent skills"""
 
     def __init__(self):
-        self.skills: Dict[str, Skill] = {}
-        self.call_history: List[SkillCall] = []
+        self.skills: dict[str, Skill] = {}
+        self.call_history: list[SkillCall] = []
+        self.stats = {
+            "total_calls": 0,
+            "successful_calls": 0,
+            "failed_calls": 0,
+        }
 
-    def register(self, skill: Skill) -> None:
+    def register(self, skill: Skill):
+        """Register a skill"""
         self.skills[skill.name] = skill
+        logger.info(f"Registered skill: {skill.name}")
 
-    def get_skill(self, name: str) -> Optional[Skill]:
-        return self.skills.get(name)
+    def unregister(self, skill_name: str) -> bool:
+        """Unregister a skill"""
+        if skill_name in self.skills:
+            del self.skills[skill_name]
+            return True
+        return False
 
-    def optimize_prompt(self, prompt: str, context: Optional[Dict] = None) -> str:
-        """优化提示词"""
-        # Extract potential skill calls from prompt
-        patterns = [
-            r"@(\w+)",  # @skill_name
-            r"use\s+(\w+)",  # use skill_name
-            r"call\s+(\w+)",  # call skill_name
-        ]
+    def get_skill(self, skill_name: str) -> Optional[Skill]:
+        """Get a skill by name"""
+        return self.skills.get(skill_name)
 
-        found_skills = set()
-        for pattern in patterns:
-            matches = re.findall(pattern, prompt, re.IGNORECASE)
-            found_skills.update(matches)
-
-        # Add relevant skills to context
-        if context is None:
-            context = {}
-
-        if "available_skills" not in context:
-            context["available_skills"] = []
-
-        for skill_name in found_skills:
-            if skill_name in self.skills and self.skills[skill_name].enabled:
-                skill = self.skills[skill_name]
-                if skill.name not in context["available_skills"]:
-                    context["available_skills"].append(skill.name)
-
-        return prompt
-
-    def call_skill(
-        self, skill_name: str, parameters: Optional[Dict] = None, context: Optional[Dict] = None
-    ) -> Any:
-        """调用技能"""
+    def execute_skill(
+        self,
+        skill_name: str,
+        input_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Execute a skill"""
         skill = self.get_skill(skill_name)
         if not skill:
-            raise ValueError(f"Skill not found: {skill_name}")
+            return {"error": f"Skill not found: {skill_name}"}
 
         if not skill.enabled:
-            raise RuntimeError(f"Skill is disabled: {skill_name}")
+            return {"error": f"Skill disabled: {skill_name}"}
 
-        params = parameters or {}
-        call = SkillCall(skill_name=skill_name, parameters=params)
+        call = SkillCall(skill_name=skill_name, input_data=input_data)
+        self.call_history.append(call)
+        self.stats["total_calls"] += 1
 
         try:
             if skill.handler:
-                result = skill.handler(**params)
-                call.result = result
+                result = skill.handler(input_data)
+                call.output_data = result
                 call.success = True
-            else:
-                result = f"Skill {skill_name} has no handler"
-                call.result = result
-        except Exception as err:
-            logger.error(f"Skill call failed: {err}")
-            call.result = str(err)
-            call.success = False
+                self.stats["successful_calls"] += 1
+                return result
+            return {"error": "No handler"}
+        except Exception as e:
+            call.error = str(e)
+            self.stats["failed_calls"] += 1
+            return {"error": str(e)}
 
-        self.call_history.append(call)
-        return call
-
-    def get_statistics(self) -> Dict[str, Any]:
-        """获取统计信息"""
-        total_calls = len(self.call_history)
-        successful_calls = sum(1 for c in self.call_history if c.success)
-
-        skill_usage: Dict[str, int] = {}
-        for call in self.call_history:
-            skill_usage[call.skill_name] = skill_usage.get(call.skill_name, 0) + 1
-
+    def get_statistics(self) -> dict[str, Any]:
+        """Get optimization statistics"""
+        total = self.stats["total_calls"]
+        success = self.stats["successful_calls"]
         return {
-            "total_calls": total_calls,
-            "successful_calls": successful_calls,
-            "success_rate": successful_calls / total_calls if total_calls > 0 else 0,
-            "skill_usage": skill_usage,
+            **self.stats,
+            "success_rate": success / total if total > 0 else 0,
+            "skill_usage": {
+                name: sum(1 for c in self.call_history if c.skill_name == name)
+                for name in self.skills
+            },
         }
 
-    def reset_history(self) -> None:
-        """重置调用历史"""
-        self.call_history.clear()
-
-
-class GitHubSkillsOptimizer:
-    """GitHub 技能优化器"""
-
-    def __init__(self, optimizer: Optional[SkillsOptimizer] = None):
-        self.optimizer = optimizer or SkillsOptimizer()
-
-    def optimize_github_prompt(self, prompt: str, repo_info: Optional[Dict] = None) -> str:
-        """优化 GitHub 相关提示词"""
-        if repo_info is None:
-            repo_info = {}
-
-        # Add repo context
-        if "repo" in repo_info:
-            prompt = f"Repository: {repo_info['repo']}\n{prompt}"
-
-        if "language" in repo_info:
-            prompt = f"Language: {repo_info['language']}\n{prompt}"
-
-        # Use base optimizer
-        return self.optimizer.optimize_prompt(prompt)
-
-    def suggest_skills(self, task: str) -> List[str]:
-        """建议相关技能"""
-        suggestions = []
-
-        task_lower = task.lower()
-        if "code" in task_lower or "function" in task_lower:
-            suggestions.append("code_generator")
-        if "test" in task_lower:
-            suggestions.append("test_writer")
-        if "debug" in task_lower or "error" in task_lower:
-            suggestions.append("debugger")
-        if "review" in task_lower:
-            suggestions.append("code_reviewer")
-
-        return suggestions
+    def optimize_skill_order(self) -> list[str]:
+        """Optimize skill execution order based on usage"""
+        usage = self.get_statistics()["skill_usage"]
+        return sorted(usage.keys(), key=lambda x: usage[x], reverse=True)
 
 
 class SkillsRegistry:
-    """技能注册表"""
+    """Registry for skill templates"""
 
     def __init__(self):
-        self._registry: Dict[str, Skill] = {}
+        self.templates: dict[str, dict[str, Any]] = {}
 
-    def register(self, skill: Skill) -> None:
-        self._registry[skill.name] = skill
+    def add_template(self, name: str, template: dict[str, Any]):
+        """Add skill template"""
+        self.templates[name] = template
 
-    def get(self, name: str) -> Optional[Skill]:
-        return self._registry.get(name)
+    def get_template(self, name: str) -> Optional[dict[str, Any]]:
+        """Get skill template"""
+        return self.templates.get(name)
 
-    def list_all(self) -> List[Skill]:
-        return list(self._registry.values())
-
-    def list_by_type(self, skill_type: SkillType) -> List[Skill]:
-        return [s for s in self._registry.values() if s.type == skill_type]
-
-    def load_from_json(self, path: str) -> None:
-        """从 JSON 文件加载技能"""
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        for skill_data in data.get("skills", []):
-            skill_type = SkillType(skill_data.get("type", "tool"))
-            skill = Skill(
-                name=skill_data["name"],
-                type=skill_type,
-                description=skill_data.get("description", ""),
-                parameters=skill_data.get("parameters", {}),
-                enabled=skill_data.get("enabled", True),
-            )
-            self.register(skill)
-
-    def save_to_json(self, path: str) -> None:
-        """保存技能到 JSON 文件"""
-        data = {
-            "skills": [
-                {
-                    "name": s.name,
-                    "type": s.type.value,
-                    "description": s.description,
-                    "parameters": s.parameters,
-                    "enabled": s.enabled,
-                }
-                for s in self._registry.values()
-            ]
-        }
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+    def list_templates(self) -> list[str]:
+        """List all templates"""
+        return list(self.templates.keys())
 
 
 class TokenBudget:
-    """Token 预算管理器"""
+    """Token budget for context management"""
 
-    def __init__(self, max_tokens: int = 4096):
+    def __init__(self, max_tokens: int = 100000):
         self.max_tokens = max_tokens
-        self.used_tokens: int = 0
+        self.allocations: dict[str, int] = {}
+        self.total_allocated = 0
 
-    def allocate(self, tokens: int, context: Optional[Dict] = None) -> bool:
-        """分配 token"""
-        if self.used_tokens + tokens > self.max_tokens:
-            return False
-        self.used_tokens += tokens
-        return True
-
-    def release(self, tokens: int) -> None:
-        """释放 token"""
-        self.used_tokens = max(0, self.used_tokens - tokens)
-
-    def reset(self) -> None:
-        """重置预算"""
-        self.used_tokens = 0
+    def allocate(self, tokens: int, owner: str = "default"):
+        """Allocate tokens to an owner"""
+        if self.total_allocated + tokens > self.max_tokens:
+            raise ValueError("Exceeds token budget")
+        self.allocations[owner] = tokens
+        self.total_allocated += tokens
 
     def get_available(self) -> int:
-        """获取可用 token 数"""
-        return self.max_tokens - self.used_tokens
+        """Get available tokens"""
+        return self.max_tokens - self.total_allocated
+
+    def release(self, owner: str):
+        """Release tokens from an owner"""
+        if owner in self.allocations:
+            self.total_allocated -= self.allocations[owner]
+            del self.allocations[owner]
+
+
+class GitHubSkillsOptimizer:
+    """GitHub-based skills optimizer"""
+
+    def __init__(self, optimizer: Optional[SkillsOptimizer] = None):
+        self.optimizer = optimizer or SkillsOptimizer()
+        self.github_api = "https://api.github.com"
+
+    def sync_from_github(self, repo: str) -> int:
+        """Sync skills from GitHub repo"""
+        count = 0
+        # Placeholder for GitHub sync
+        logger.info(f"Syncing skills from {repo}")
+        return count
+
+    def push_to_github(self, repo: str) -> bool:
+        """Push skills to GitHub repo"""
+        # Placeholder for GitHub push
+        logger.info(f"Pushing skills to {repo}")
+        return True

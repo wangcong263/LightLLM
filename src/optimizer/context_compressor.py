@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Context Compressor - Reduces context length while preserving meaning"""
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
 
 
 @dataclass
@@ -51,7 +50,7 @@ if __name__ == "__main__":
     compressor = ContextCompressor()
 
     if len(sys.argv) > 1:
-        with open(sys.argv[1], "r", encoding="utf-8") as f:
+        with open(sys.argv[1], encoding="utf-8") as f:
             data = json.load(f)
         compressed = compressor.compress_messages(data)
         print(json.dumps(compressed, ensure_ascii=False, indent=2))
