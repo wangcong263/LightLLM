@@ -97,10 +97,8 @@ class LlamaCppBackend(ModelBackend):
         try:
             from llama_cpp import Llama
             from llama_cpp import LlamaTokenizer
-        except ImportError:
-            raise ImportError(
-                "llama-cpp-python 未安装。请运行: pip install llama-cpp-python"
-            )
+        except ImportError as err:
+            raise ImportError("llama-cpp-python 未安装。请运行: pip install llama-cpp-python") from err
 
         logger.info(f"Loading llama.cpp model from {self.model_path}")
 
@@ -155,8 +153,8 @@ class LlamaCppBackend(ModelBackend):
 
         try:
             from llama_cpp import Llama
-        except ImportError:
-            raise ImportError("llama-cpp-python 未安装")
+        except ImportError as err:
+            raise ImportError("llama-cpp-python 未安装。请运行: pip install llama-cpp-python") from err
 
         # 创建异步流式生成器
         def create_stream():
@@ -234,10 +232,8 @@ class VLLMBackend(ModelBackend):
         """加载 vLLM 模型"""
         try:
             from vllm import LLM, SamplingParams
-        except ImportError:
-            raise ImportError(
-                "vllm 未安装。请运行: pip install vllm"
-            )
+        except ImportError as err:
+            raise ImportError("vllm 未安装。请运行: pip install vllm") from err
 
         logger.info(f"Loading vLLM model from {self.model_path}")
 
@@ -361,10 +357,8 @@ class CTransformersBackend(ModelBackend):
         """加载 CTransformers 模型"""
         try:
             from ctransformers import AutoModelForCausalLM, AutoTokenizer
-        except ImportError:
-            raise ImportError(
-                "ctransformers 未安装。请运行: pip install ctransformers"
-            )
+        except ImportError as err:
+            raise ImportError("ctransformers 未安装。请运行: pip install ctransformers") from err
 
         logger.info(f"Loading CTransformers model from {self.model_path}")
 
