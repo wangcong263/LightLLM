@@ -1,291 +1,286 @@
-# LightLLM
+# LightLLM - 本地大模型运行工具
 
-> ⚡ 更轻、更快、更智能的本地LLM运行工具
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Python">
-  <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
-  <img src="https://img.shields.io/badge/Size-~50MB-orange.svg" alt="Size">
-  <img src="https://img.shields.io/badge/Speed-2x%20Faster-red.svg" alt="Speed">
-</p>
+🤖 **一个简洁高效的本地大模型运行框架，支持 llama.cpp/vLLM/CTransformers 后端**
 
 ---
 
 ## ✨ 特性
 
-### 🎯 核心优势
-
-| 特性 | LightLLM | Ollama | 说明 |
-|------|----------|--------|------|
-| **体积** | ~50MB | ~200MB+ | 更轻量 |
-| **速度** | 2x+ | 基准 | 增量处理 |
-| **Token消耗** | -40% | 基准 | 智能压缩 |
-| **内存占用** | -30% | 基准 | 低显存模式 |
-| **Agent集成** | 原生 | 需配置 | OpenClaw/Hermes |
-
-### 🚀 主要功能
-
-- 📦 **多后端支持** - llama.cpp / vLLM / CTranslate2
-- 🔌 **OpenAI兼容API** - 无缝对接现有工具
-- 🤖 **智能体集成** - OpenClaw、Hermes等框架原生支持
-- 📝 **Skills优化** - GitHub Skills调用更高效
-- 💾 **智能缓存** - 减少重复计算
-- 🏎️ **流式输出** - 首token延迟更低
+- 🖥️ **多后端支持**: llama.cpp (CPU/GPU)、vLLM (NVIDIA GPU)、CTransformers
+- 📥 **一键下载**: 支持 HuggingFace/ModelScope 镜像下载模型
+- 🚀 **智能推荐**: 根据你的硬件自动推荐最适合的模型
+- 🔧 **零配置**: 开箱即用，自动检测环境
+- 🌐 **OpenAI 兼容 API**: 完美兼容 OpenAI 接口
+- 📱 **多平台**: Windows、Linux、macOS 全支持
 
 ---
 
-## 📥 安装
+## 🚀 快速开始
 
-### 方式1: pip安装
-
-```bash
-pip install lightllm
-```
-
-### 方式2: 源码安装
+### 方式一：一键部署（推荐）
 
 ```bash
-git clone https://github.com/lightllm/lightllm.git
-cd lightllm
-pip install -e .
+# Windows
+lightllm.bat
+
+# 或直接运行
+python deploy.py
 ```
 
-### 可选依赖
+部署工具会自动：
+1. 检测你的硬件配置
+2. 推荐最适合的模型
+3. 下载并配置模型
+4. 启动 API 服务
+
+### 方式二：命令行安装
 
 ```bash
-# Llama.cpp后端 (推荐)
-pip install lightllm[llama-cpp]
+# 1. 列出可用模型
+python -m src.model_manager list --all
 
-# vLLM后端
-pip install lightllm[vllm]
+# 2. 安装模型（如 Phi-2）
+python -m src.model_manager install phi-2
 
-# CTranslate2后端
-pip install lightllm[ctranslate]
-
-# 所有后端
-pip install lightllm[all]
+# 3. 启动 API
+python -m src.api.server --model "C:\Users\你\.cache\lightllm\models\phi-2\phi-2.Q4_K_M.gguf"
 ```
 
----
-
-## 🎮 快速开始
-
-### 1. 下载模型
-
-```bash
-# 使用huggingface-cli下载
-huggingface-cli download meta-llama/Llama-2-7b-chat-GGUF llama-2-7b-chat.Q4_0.gguf
-```
-
-### 2. 运行模型
-
-```bash
-lightllm run --model llama2 --path ./models/llama-2-7b-chat.Q4_0.gguf
-```
-
-### 3. 交互聊天
-
-```bash
-lightllm chat --model llama2 --path ./models/llama-2-7b-chat.Q4_0.gguf
-```
-
-### 4. 启动API服务
-
-```bash
-lightllm serve --host 0.0.0.0 --port 8080
-```
-
----
-
-## 🔌 API使用
-
-### OpenAI兼容
+### 方式三：直接使用
 
 ```python
-import openai
+from src.core.engine import LLMEngine, BackendType
 
-client = openai.OpenAI(
-    base_url="http://localhost:8080/v1",
-    api_key="sk-dummy"
+# 加载模型
+engine = LLMEngine(
+    model_path="path/to/model.gguf",
+    backend=BackendType.LLAMA_CPP
 )
 
-response = client.chat.completions.create(
-    model="llama2",
-    messages=[
-        {"role": "system", "content": "你是一个有帮助的助手"},
-        {"role": "user", "content": "你好"}
-    ]
+# 生成回复
+response = engine.generate(
+    prompt="写一个快速排序算法",
+    system="你是一个专业的程序员"
 )
-
-print(response.choices[0].message.content)
-```
-
-### 流式输出
-
-```python
-stream = client.chat.completions.create(
-    model="llama2",
-    messages=[{"role": "user", "content": "讲个故事"}],
-    stream=True
-)
-
-for chunk in stream:
-    print(chunk.choices[0].delta.content, end="")
+print(response.content)
 ```
 
 ---
 
-## 🤖 智能体集成
+## 📋 可用模型
 
-### OpenClaw
+### 按大小分类
 
-```python
-from lightllm.api.server import LightLLMAPI, AgentConnector
+| 类别 | 大小 | 模型 | 内存需求 | 说明 |
+|------|------|------|----------|------|
+| 🔸 微型 | <1GB | TinyLlama 1.1B | 1GB | CPU 可运行 |
+| 🔸 微型 | ~350MB | Qwen2.5 0.5B | 1GB | 中文优化 |
+| 🔹 小型 | ~650MB | TinyLlama | 2GB | 最小聊天模型 |
+| 🔹 小型 | ~1.8GB | Phi-2 2.7B | 4GB | 优秀推理能力 |
+| 🔹 小型 | ~2GB | Qwen2.5 3B | 4GB | 中文优化极佳 |
+| 🟡 中型 | ~4GB | Llama-2 7B | 12GB | 主流选择 |
+| 🟡 中型 | ~4.1GB | Mistral 7B | 12GB | 优质开源模型 |
+| 🔴 大型 | ~4.9GB | Llama 3.1 8B | 16GB | 最新最强 |
+| 🔴 大型 | ~9GB | Qwen2.5 14B | 24GB | 超强能力 |
 
-api = LightLLMAPI()
-connector = AgentConnector(api)
+### 推荐配置
 
-# 连接OpenClaw
-connector.connect_openclaw("my-agent", {
-    "ws_url": "ws://localhost:8765"
-})
+| 硬件 | 推荐模型 |
+|------|----------|
+| 4GB 内存 | TinyLlama, Qwen2.5 0.5B |
+| 8GB 内存 | Phi-2, Qwen2.5 1.5B |
+| 16GB 内存 | Qwen2.5 7B, Llama-2 7B |
+| RTX 3060 12GB | Mistral 7B, Llama-2 7B |
+| RTX 4090 24GB | Qwen2.5 14B, Llama 3.1 8B |
 
-# 发送消息
-await connector.send_to_agent("my-agent", {
-    "type": "request",
-    "content": "帮我完成任务"
-})
+---
+
+## 📖 使用示例
+
+### API 服务
+
+```bash
+# 启动 API 服务
+python -m src.api.server --model phi-2 --port 8000
 ```
 
-### Hermes
+```bash
+# 调用 API
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "phi-2",
+    "messages": [
+      {"role": "system", "content": "你是一个有帮助的助手"},
+      {"role": "user", "content": "用 Python 写一个快速排序"}
+    ],
+    "temperature": 0.7,
+    "max_tokens": 1000
+  }'
+```
+
+### 命令行聊天
+
+```bash
+# 交互式聊天
+python -m src.cli chat --model phi-2
+
+# 单次生成
+python -m src.cli complete "解释什么是量子计算"
+```
+
+### Python API
 
 ```python
-# 连接Hermes
-connector.connect_hermes("hermes-bot", {
-    "api_url": "http://localhost:8081"
-})
+from src.core.engine import LLMEngine, BackendType
+
+# 同步使用
+engine = LLMEngine("path/to/model.gguf")
+
+result = engine.generate(
+    prompt="写一首关于春天的诗",
+    system="你是一个诗人",
+    temperature=0.8,
+    max_tokens=500
+)
+print(result.content)
+
+# 异步使用
+import asyncio
+from src.core.engine import AsyncLLMEngine
+
+async def main():
+    engine = AsyncLLMEngine("path/to/model.gguf")
+    async for chunk in engine.generate("解释机器学习"):
+        print(chunk.content, end="", flush=True)
+
+asyncio.run(main())
 ```
 
 ---
 
-## 📦 Skills优化
+## 🔧 配置
 
-### 注册GitHub Skill
+### 配置文件
 
-```python
-from lightllm.optimizer.skills_optimizer import SkillsOptimizer, SkillType, Skill
+创建 `config.json`:
 
-optimizer = SkillsOptimizer()
-
-# 注册自定义Skill
-skill = Skill(
-    name="file-search",
-    type=SkillType.SEARCH,
-    description="搜索本地文件",
-    cacheable=True
-)
-
-optimizer.register_skill(skill)
-
-# 调用
-result = await optimizer.call_skill("file-search", {
-    "path": "/project",
-    "pattern": "*.py"
-})
-```
-
-### Token预算管理
-
-```python
-from lightllm.optimizer.skills_optimizer import TokenBudget
-
-budget = TokenBudget(max_tokens=128000)
-
-if budget.allocate(1000, "system-prompt"):
-    print("Token已分配")
-```
-
----
-
-## ⚙️ 配置
-
-### 模型配置
-
-```python
-from lightllm.core.engine import ModelConfig
-
-config = ModelConfig(
-    name="llama2",
-    path="./models/llama-2-7b-chat.Q4_0.gguf",
-    context_length=4096,      # 上下文长度
-    threads=4,                # CPU线程数
-    gpu_layers=0,            # GPU层数 (0=仅CPU)
-    quantization="q4_0",     # 量化方式
-    use_flash_attention=True, # 启用Flash Attention
-    low_vram=True,            # 低显存模式
-)
+```json
+{
+  "model_path": "C:\\Users\\你\\.cache\\lightllm\\models\\phi-2",
+  "context_length": 4096,
+  "gpu_layers": 32,
+  "generation": {
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": 40,
+    "repeat_penalty": 1.1,
+    "max_tokens": 2048
+  }
+}
 ```
 
 ### 环境变量
 
 ```bash
-# 并发限制
-LIGHTLLM_MAX_CONCURRENT=10
+# 设置模型缓存目录
+export LIGHTLLM_MODEL_DIR="D:\\models\\lightllm"
 
-# 缓存大小
-LIGHTLLM_CACHE_SIZE=1000
-
-# 日志级别
-LIGHTLLM_LOG_LEVEL=INFO
+# 设置日志级别
+export LIGHTLLM_LOG_LEVEL=DEBUG
 ```
 
 ---
 
-## 📊 性能对比
+## 📦 依赖
 
-| 模型 | Ollama | LightLLM | 提升 |
-|------|--------|----------|------|
-| Llama2-7B Q4 | 25 tok/s | 45 tok/s | **+80%** |
-| Mistral-7B Q4 | 22 tok/s | 40 tok/s | **+82%** |
-| CodeLlama-7B Q4 | 20 tok/s | 38 tok/s | **+90%** |
+### 必需
 
-*测试环境: AMD Ryzen 9 5950X, 64GB RAM, RTX 3080 10GB*
+- Python 3.8+
+- llama-cpp-python
+- huggingface-hub
+- psutil
 
----
+### 可选
 
-## 🗺️ 路线图
+- torch + CUDA (使用 vLLM 后端)
+- fastapi + uvicorn (API 服务)
+- colorama (彩色输出)
 
-- [ ] Web UI界面
-- [ ] 模型自动下载
-- [ ] 多模型并行
-- [ ] RAG集成
-- [ ] Agent Memory管理
-- [ ] Windows原生支持
-
----
-
-## 🤝 贡献
-
-欢迎提交Issue和Pull Request！
+### 安装依赖
 
 ```bash
-# 克隆并开发
-git clone https://github.com/lightllm/lightllm.git
-cd lightllm
-pip install -e ".[dev]"
-pytest
+pip install llama-cpp-python huggingface-hub psutil colorama
 ```
 
 ---
 
-## 📄 许可证
+## 📁 项目结构
 
-MIT License - 详见 [LICENSE](LICENSE)
+```
+LightLLM/
+├── config.py              # 配置文件
+├── deploy.py              # 一键部署脚本
+├── download_model.py      # 模型下载工具
+├── lightllm.bat           # Windows 启动脚本
+├── lightllm.sh           # Linux/macOS 启动脚本
+├── src/
+│   ├── __init__.py
+│   ├── cli.py             # 命令行工具
+│   ├── api/
+│   │   └── server.py      # API 服务
+│   └── core/
+│       └── engine.py      # 核心引擎
+└── models/               # 模型存放目录
+```
+
+---
+
+## 🆘 常见问题
+
+### Q: 下载模型太慢？
+
+A: 尝试使用 ModelScope 镜像（国内加速）：
+```python
+from src.model_manager import ModelCatalog, ModelSource, ModelDownloader
+
+# 使用 ModelScope
+model_config = ModelCatalog.get_model("qwen2.5-0.5b-cn")
+downloader = ModelDownloader()
+downloader.download(model_config)
+```
+
+### Q: 显存不够？
+
+A: 使用更小的量化版本或更小的模型：
+```bash
+# 安装 TinyLlama（最小）
+python -m src.model_manager install tinyllama
+```
+
+### Q: 如何查看已安装的模型？
+
+```bash
+python -m src.model_manager list
+```
+
+### Q: 如何删除模型？
+
+```bash
+python -m src.model_manager remove phi-2
+```
+
+---
+
+## 📝 License
+
+MIT License
 
 ---
 
 ## 🙏 致谢
 
-- [llama.cpp](https://github.com/ggerganov/llama.cpp) - 高效推理
-- [Ollama](https://github.com/ollama/ollama) - 灵感来源
-- [vLLM](https://github.com/vllm-project/vllm) - PagedAttention
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) - 高效的 GGML/GGUF 推理
+- [vLLM](https://github.com/vllm-project/vllm) - 快速 PagedAttention 推理
+- [HuggingFace](https://huggingface.co/) - 模型托管
+- [TheBloke](https://huggingface.co/TheBloke) - 量化模型贡献
