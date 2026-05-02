@@ -1,10 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lightllm"
+version = "1.0.0"
+description = "轻量化本地LLM运行工具"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "requests",
+    "tqdm",
+    "aiohttp",
+    "flask>=3.0.0",
+    "flask-cors",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py39"
 
 [tool.ruff.lint]
-# N999: Invalid module name (允许 docstring 中的大小写)
-# E501: Line too long (已忽略)
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
 ignore = ["E501", "N999"]
 
