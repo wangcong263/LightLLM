@@ -64,7 +64,7 @@ class CLI:
             print(f"✅ Model loaded!")
             return True
         else:
-            print(f"❌ Failed to load model!")
+            print("❌ Failed to load model!")
             return False
 
     async def chat(self, system: Optional[str] = None):
