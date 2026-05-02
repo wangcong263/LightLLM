@@ -381,3 +381,31 @@ class TokenBudget:
             "remaining": self.get_remaining(),
             "usage_rate": self.used_tokens / self.max_tokens,
         }
+
+
+
+class GitHubSkillsOptimizer:
+    """GitHub技能优化器 - 用于从GitHub获取和优化技能"""
+
+    def __init__(self, optimizer):
+        self.optimizer = optimizer
+        self.cache = {}
+
+    def optimize_skill(self, skill):
+        """优化单个技能"""
+        return self.optimizer.optimize(skill)
+
+    def optimize_batch(self, skills):
+        """批量优化技能"""
+        return [self.optimize_skill(s) for s in skills]
+
+    def get_stats(self):
+        """获取优化统计"""
+        return {
+            "optimizer_type": "github",
+            "cached_skills": len(self.cache),
+        }
+
+    def clear_cache(self):
+        """清空缓存"""
+        self.cache.clear()

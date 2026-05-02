@@ -1,198 +1,61 @@
-"""
-上下文压缩器 - 减少Token使用
-"""
-import re
-from typing import List, Dict, Any, Tuple, Optional, TYPE_CHECKING
-import logging
+#!/usr/bin/env python3
+"""上下文压缩器 - 智能压缩对话上下文"""
 
-if TYPE_CHECKING:
-    from .skills_optimizer import SkillsOptimizer
+from dataclasses import dataclass
+from typing import List, Dict, Optional
 
-logger = logging.getLogger(__name__)
+
+@dataclass
+class CompressionConfig:
+    """压缩配置"""
+    max_tokens: int = 4000
+    preserve_system: bool = True
+    preserve_last_n: int = 2
 
 
 class ContextCompressor:
-    """
-    上下文压缩器
+    """上下文压缩器"""
 
-    策略：
-    1. 删除冗余信息
-    2. 提取关键实体
-    3. 摘要长文本
-    4. 合并相似内容
-    """
-
-    def __init__(self, target_tokens: int = 8192):
-        self.target_tokens = target_tokens
-        self.importance_keywords = {
-            "function", "class", "def", "return", "import",
-            "error", "fix", "bug", "feature", "implement",
-            "config", "setup", "init", "run", "execute",
-        }
+    def __init__(self, config: Optional[CompressionConfig] = None):
+        self.config = config or CompressionConfig()
 
     def compress(self, messages: List[Dict]) -> List[Dict]:
         """压缩消息列表"""
-        current_tokens = self._estimate_tokens(messages)
+        if not messages:
+            return []
 
-        if current_tokens <= self.target_tokens:
-            return messages
+        compressed = []
 
-        # 逐步压缩
-        compressed = messages.copy()
+        # 保留系统消息
+        if self.config.preserve_system:
+            for msg in messages:
+                if msg.get("role") == "system":
+                    compressed.append(msg)
 
-        # 1. 移除重复内容
-        compressed = self._remove_duplicates(compressed)
+        # 保留最近的消息
+        non_system = [m for m in messages if m.get("role") != "system"]
+        recent = non_system[-self.config.preserve_last_n:] if self.config.preserve_last_n > 0 else []
 
-        # 2. 压缩每个消息
-        compressed = [self._compress_message(m) for m in compressed]
+        # 简化中间消息
+        if len(non_system) > self.config.preserve_last_n:
+            middle_count = len(non_system) - self.config.preserve_last_n
+            # 添加摘要标记
+            compressed.append({
+                "role": "system",
+                "content": f"[已省略 {middle_count} 条消息]"
+            })
 
-        # 3. 如果还不够，摘要旧消息
-        while self._estimate_tokens(compressed) > self.target_tokens and len(compressed) > 2:
-            compressed = self._summarize_oldest(compressed)
-
+        compressed.extend(recent)
         return compressed
 
-    def _remove_duplicates(self, messages: List[Dict]) -> List[Dict]:
-        """移除重复消息"""
-        seen = set()
-        unique = []
+    def estimate_tokens(self, text: str) -> int:
+        """简单估算token数量"""
+        return len(text) // 4
 
-        for msg in messages:
-            key = f"{msg.get('role', '')}:{msg.get('content', '')[:100]}"
-            if key not in seen:
-                seen.add(key)
-                unique.append(msg)
-
-        return unique
-
-    def _compress_message(self, message: Dict) -> Dict:
-        """压缩单条消息"""
-        content = message.get("content", "")
-
-        if not content:
-            return message
-
-        # 短内容不压缩
-        if len(content) < 500:
-            return message
-
-        # 压缩长文本
-        compressed = self._compress_text(content)
-
-        return {**message, "content": compressed}
-
-    def _compress_text(self, text: str) -> str:
-        """压缩文本"""
-        # 移除注释
-        lines = text.split('\n')
-        code_lines = []
-
-        for line in lines:
-            stripped = line.strip()
-            # 保留代码，移除注释
-            if stripped.startswith('#') or stripped.startswith('//'):
-                continue
-            code_lines.append(line)
-
-        text = '\n'.join(code_lines)
-
-        # 移除多余空行
-        text = re.sub(r'\n{3,}', '\n\n', text)
-
-        # 如果还是太长，截断
-        if len(text) > 2000:
-            text = text[:1000] + '\n...\n' + text[-500:]
-
-        return text
-
-    def _summarize_oldest(self, messages: List[Dict]) -> List[Dict]:
-        """摘要最老的消息"""
-        if len(messages) <= 2:
-            return messages
-
-        # 保留系统消息和最新消息
-        system_msg = messages[0] if messages[0].get("role") == "system" else None
-        recent = messages[-2:]
-
-        # 摘要中间消息
-        middle = messages[1:-2] if len(messages) > 2 else []
-
-        if middle:
-            summary = self._create_summary(middle)
-            summarized = [summary]
-        else:
-            summarized = []
-
-        # 重新构建
-        result = []
-        if system_msg:
-            result.append(system_msg)
-        if summarized:
-            result.extend(summarized)
-        result.extend(recent)
-
-        return result
-
-    def _create_summary(self, messages: List[Dict]) -> Dict:
-        """创建摘要"""
-        # 提取关键信息
-        entities = set()
-        actions = []
-
-        for msg in messages:
-            content = msg.get("content", "")
-
-            # 提取关键词
-            words = re.findall(r'\b\w+\b', content.lower())
-            entities.update(w for w in words if len(w) > 5)
-
-            # 提取操作
-            if any(kw in content.lower() for kw in ["create", "delete", "update", "modify"]):
-                actions.append(content[:100])
-
-        summary = f"[Previous context summarized: {len(messages)} messages, {len(entities)} key concepts]"
-
+    def get_stats(self) -> Dict:
+        """获取统计信息"""
         return {
-            "role": "system",
-            "content": summary,
+            "max_tokens": self.config.max_tokens,
+            "preserve_system": self.config.preserve_system,
+            "preserve_last_n": self.config.preserve_last_n,
         }
-
-    def _estimate_tokens(self, messages: List[Dict]) -> int:
-        """估计Token数量"""
-        total = 0
-        for msg in messages:
-            content = msg.get("content", "")
-            total += len(content) // 4  # 粗略估计
-
-        # 加上消息结构开销
-        total += len(messages) * 4
-
-        return total
-
-
-class StreamingOptimizer:
-    """
-    流式输出优化器
-    减少首token延迟
-    """
-
-    def __init__(self):
-        self.prefetch_enabled = True
-        self.predictive_decode = True
-
-    async def stream_with_optimization(self, generator):
-        """优化流式输出"""
-        buffer = ""
-        min_chunk_size = 4
-
-        async for chunk in generator:
-            buffer += chunk
-
-            # 小块合并
-            if len(buffer) >= min_chunk_size:
-                yield buffer
-                buffer = ""
-
-        # 输出剩余
-        if buffer:
-            yield buffer

@@ -8,6 +8,43 @@ import os
 import logging
 from typing import Optional, List, Dict, Any, AsyncIterator, Union
 from dataclasses import dataclass, field
+
+@dataclass
+class ModelConfig:
+    """模型配置"""
+    name: str = ""
+    path: str = ""
+    backend: str = "llama.cpp"
+    quantize: str = "Q4_K_M"
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "path": self.path,
+            "backend": self.backend,
+            "quantize": self.quantize,
+        }
+
+
+class ModelManager:
+    """模型管理器"""
+
+    def __init__(self):
+        self.models = {}
+
+    def add_model(self, name: str, config: ModelConfig):
+        self.models[name] = config
+
+    def remove_model(self, name: str):
+        if name in self.models:
+            del self.models[name]
+
+    def list_models(self):
+        return list(self.models.keys())
+
+    def get_model(self, name: str):
+        return self.models.get(name)
+
 from pathlib import Path
 from enum import Enum
 
